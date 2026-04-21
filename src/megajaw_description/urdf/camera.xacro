@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <link name="camera_link">
+
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <box size="${camera_lx} ${camera_ly} ${camera_lz}" />
+            </geometry>
+            <material name="black" />
+        </visual>
+
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <box size="${camera_lx} ${camera_ly} ${camera_lz}" />
+            </geometry>
+        </collision>
+
+        <xacro:box_inertial m="${camera_mass}" lx="${camera_lx}" ly="${camera_ly}" lz="${camera_lz}"
+            o_xyz="0 0 0" o_rpy="0 0 0" />
+    </link>
+
+    <joint name="camera_base_joint" type="fixed">
+        <origin xyz="${(base_lx + camera_lx) / 2} 0 ${camera_offset_z}" rpy="0 0 0" />
+        <parent link="base_link" />
+        <child link="camera_link" />
+    </joint>
+
+    <joint type="fixed" name="camera_optical_joint">
+        <origin xyz="0 0 0" rpy="-1.5707 0 -1.5707" />
+        <child link="camera_link_optical" />
+        <parent link="camera_link" />
+    </joint>
+
+    <link name="camera_link_optical" />
+</robot>

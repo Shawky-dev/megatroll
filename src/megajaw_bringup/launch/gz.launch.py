@@ -90,6 +90,31 @@ def generate_launch_description():
         output='screen'
     )
     
+    gz_image_bridge_node = Node(
+        package="ros_gz_image",
+        executable="image_bridge",
+        arguments=[
+            "/camera/image",
+        ],
+        output="screen",
+        parameters=[
+            {'use_sim_time': LaunchConfiguration('use_sim_time'),
+             'camera.image.compressed.jpeg_quality': 75},
+        ],
+    )
+
+    relay_camera_info_node = Node(
+        package='topic_tools',
+        executable='relay',
+        name='relay_camera_info',
+        output='screen',
+        arguments=['camera/camera_info', 'camera/image/camera_info'],
+        parameters=[
+            {'use_sim_time': LaunchConfiguration('use_sim_time')},
+        ]
+    )
+    
+    # rviz
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',
@@ -118,9 +143,6 @@ def generate_launch_description():
                 on_exit=[diff_drive_base_controller_spawner],
             )
         ),
-        bridge,
-        gz_spawn_entity,
-        rviz_node,
         
         # Launch Arguments
         DeclareLaunchArgument(
@@ -132,6 +154,13 @@ def generate_launch_description():
             'rviz',
             default_value='false',
             description='Launch RViz2'),
+        
+        # Nodes
+        bridge,
+        gz_spawn_entity,
+        gz_image_bridge_node,
+        relay_camera_info_node,
+        rviz_node,
     ])
     ld.add_action(OpaqueFunction(function=robot_state_publisher_callback))
     
