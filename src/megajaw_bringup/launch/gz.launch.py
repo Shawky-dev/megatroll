@@ -90,6 +90,7 @@ def generate_launch_description():
         output='screen'
     )
     
+    # Node to bridge camera image with image_transport and compressed_image_transport
     gz_image_bridge_node = Node(
         package="ros_gz_image",
         executable="image_bridge",
@@ -103,6 +104,7 @@ def generate_launch_description():
         ],
     )
 
+    # Relay node to republish /camera/camera_info to /camera/image/camera_info
     relay_camera_info_node = Node(
         package='topic_tools',
         executable='relay',
@@ -113,8 +115,9 @@ def generate_launch_description():
             {'use_sim_time': LaunchConfiguration('use_sim_time')},
         ]
     )
+
     
-    # rviz
+    # Rviz
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',
@@ -154,13 +157,13 @@ def generate_launch_description():
             'rviz',
             default_value='false',
             description='Launch RViz2'),
-        
+            
         # Nodes
         bridge,
         gz_spawn_entity,
+        rviz_node,
         gz_image_bridge_node,
         relay_camera_info_node,
-        rviz_node,
     ])
     ld.add_action(OpaqueFunction(function=robot_state_publisher_callback))
     
