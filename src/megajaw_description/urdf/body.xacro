@@ -1,0 +1,128 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:property name="base_lx" value="0.20" />
+    <xacro:property name="base_ly" value="0.18" />
+    <xacro:property name="base_lz" value="0.05" />
+    <xacro:property name="base_mass" value="0.2" />
+
+    <xacro:property name="wheel_radius" value="0.03" />
+    <xacro:property name="wheel_length" value="0.023" />
+    <xacro:property name="wheel_offset_x" value="${-base_lx / 2 + 0.06}" />
+    <xacro:property name="wheel_offset_z" value="${-base_lz / 2 + 0.013}" />
+    <xacro:property name="wheel_mass" value="0.05" />
+
+    <xacro:property name="caster_radius" value="0.01" />
+    <xacro:property name="caster_offset_x" value="${base_lx / 2 - 0.014}" />
+    <xacro:property name="caster_mass" value="0.09" />
+
+
+    <link name="base_footprint"></link>
+    <link name="base_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <box size="${base_lx} ${base_ly} ${base_lz}" />
+            </geometry>
+            <material name="red" />
+        </visual>
+
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <box size="${base_lx} ${base_ly} ${base_lz}" />
+            </geometry>
+        </collision>
+
+        <xacro:box_inertial m="${base_mass}" lx="${base_lx}" ly="${base_ly}" lz="${base_lz}"
+            o_xyz="0 0 0" o_rpy="0 0 0" />
+    </link>
+
+    <joint name="base_footprint_joint" type="fixed">
+        <origin xyz="0 0 ${base_lz / 2}" rpy="0 0 0" />
+        <parent link="base_footprint" />
+        <child link="base_link" />
+    </joint>
+
+    <link name="left_wheel_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <cylinder radius="${wheel_radius}" length="${wheel_length}" />
+            </geometry>
+            <material name="black" />
+        </visual>
+
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <cylinder radius="${wheel_radius}" length="${wheel_length}" />
+            </geometry>
+        </collision>
+
+        <xacro:cylinder_inertial m="${wheel_mass}" r="${wheel_radius}" h="${wheel_length}"
+            o_xyz="0 0 0" o_rpy="0 0 0" />
+    </link>
+
+    <joint name="left_wheel_base_joint" type="continuous">
+        <origin xyz="${wheel_offset_x} -${base_ly / 2 + wheel_length / 2} ${wheel_offset_z}"
+            rpy="${pi/2} 0 0" />
+        <parent link="base_link" />
+        <child link="left_wheel_link" />
+        <axis xyz="0 0 1" />
+    </joint>
+
+    <link name="right_wheel_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <cylinder radius="${wheel_radius}" length="${wheel_length}" />
+            </geometry>
+            <material name="black" />
+        </visual>
+
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <cylinder radius="${wheel_radius}" length="${wheel_length}" />
+            </geometry>
+        </collision>
+
+        <xacro:cylinder_inertial m="${wheel_mass}" r="${wheel_radius}" h="${wheel_length}"
+            o_xyz="0 0 0" o_rpy="0 0 0" />
+    </link>
+
+    <joint name="right_wheel_base_joint" type="continuous">
+        <origin xyz="${wheel_offset_x} ${base_ly / 2 + wheel_length / 2} ${wheel_offset_z}"
+            rpy="${pi/2} 0 0" />
+        <parent link="base_link" />
+        <child link="right_wheel_link" />
+        <axis xyz="0 0 1" />
+    </joint>
+
+    <link name="caster_link">
+
+        <visual>
+            <origin xyz="0 0 ${-caster_radius}" rpy="0 0 0" />
+            <geometry>
+                <sphere radius="${caster_radius}" />
+            </geometry>
+            <material name="gray" />
+        </visual>
+        
+        <collision>
+            <origin xyz="0 0 ${-caster_radius}" rpy="0 0 0" />
+            <geometry>
+                <sphere radius="${caster_radius}" />
+            </geometry>
+        </collision>
+
+        <xacro:sphere_inertial m="${caster_mass}" r="${caster_radius}" o_xyz="0 0 0" o_rpy="0 0 0" />
+    </link>
+
+    <joint name="caster_base_joint" type="fixed">
+        <origin xyz="${caster_offset_x} 0 ${-base_lz / 2}" rpy="0 0 0" />
+        <parent link="base_link" />
+        <child link="caster_link" />
+    </joint>
+
+</robot>

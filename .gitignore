@@ -1,0 +1,117 @@
+# Build, install, and log directories from colcon
+build/
+install/
+log/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.so
+.Python
+
+# C++ build artifacts
+*.o
+*.lo
+*.la
+*.d
+*.dll
+*.exe
+*.so.*
+*.dylib
+*.a
+*.lib
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.vs/
+.codeium/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# Gazebo / simulation leftovers
+*.log
+*.db
+~/.gazebo/
+*.gazebo
+
+# ROS specific
+*.bag
+*.db3
+*.pcd
+*.tflite
+*.rviz
+!*.rviz   # but you might want to keep your custom rviz config
+*.pyc
+*.pyo
+*.pyd
+
+# Doxygen / docs
+doc/html/
+doc/latex/
+
+# Coverage reports
+coverage/
+.coverage
+*.gcda
+*.gcno
+*.gcov
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.bak
+*.tmp
+
+# User-specific files
+*.user
+*.userosscache
+*.sln.docstates
+
+# Intel cache (if you use Intel compilers / tools)
+*.ti
+*.il
+*.rpo
+
+# Compiled Python
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.backup
+*.old
+*.orig
+
+# ROS2 launch / param files that are generated (if any)
+*_parameters.yaml
+*_params.yaml
+
+# Colcon mixin
+.mixin/
+
+# Any other temporary or cache folders
+.cache/
+.temp/
+temp/
