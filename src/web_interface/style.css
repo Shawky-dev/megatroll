@@ -1,0 +1,209 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+        Cantarell, sans-serif;
+    background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e0e0e0;
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background:
+        radial-gradient(
+            circle at 20% 50%,
+            rgba(59, 130, 246, 0.08) 0%,
+            transparent 50%
+        ),
+        radial-gradient(
+            circle at 80% 80%,
+            rgba(139, 92, 246, 0.08) 0%,
+            transparent 50%
+        );
+    pointer-events: none;
+    z-index: -1;
+}
+
+.container {
+    width: 90%;
+    max-width: 400px;
+}
+
+.joystick-panel {
+    background: rgba(20, 25, 40, 0.9);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 32px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    text-align: center;
+}
+
+.title {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 24px;
+    color: #fff;
+    letter-spacing: 0.5px;
+}
+
+#joystickCanvas {
+    display: block;
+    margin: 0 auto 28px;
+    background: rgba(15, 20, 31, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    cursor: grab;
+    width: 280px;
+    height: 280px;
+}
+
+#joystickCanvas:active {
+    cursor: grabbing;
+}
+
+.controls {
+    margin-bottom: 24px;
+}
+
+.scale-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.scale-box span {
+    font-size: 18px;
+}
+
+#speedScale {
+    width: 200px;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+#speedScale::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+    transition: all 0.2s ease;
+}
+
+#speedScale::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+    transform: scale(1.1);
+}
+
+#speedScale::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+    transition: all 0.2s ease;
+}
+
+#speedScale::-moz-range-thumb:hover {
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+    transform: scale(1.1);
+}
+
+.status {
+    padding: 14px 18px;
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 10px;
+    color: #60a5fa;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.3px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.status.error {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+}
+
+.status.disconnected {
+    background: rgba(168, 85, 247, 0.15);
+    border-color: rgba(168, 85, 247, 0.3);
+    color: #d8b4fe;
+}
+
+.debug-output {
+    margin-top: 16px;
+    padding: 12px;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 8px;
+    font-family: "Monaco", "Courier New", monospace;
+    font-size: 12px;
+    color: #60a5fa;
+    line-height: 1.6;
+}
+
+.debug-output div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.debug-output span {
+    font-weight: 600;
+    color: #06b6d4;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .joystick-panel {
+        padding: 24px;
+        border-radius: 16px;
+    }
+
+    .title {
+        font-size: 20px;
+        margin-bottom: 20px;
+    }
+
+    #joystickCanvas {
+        width: 240px;
+        height: 240px;
+        margin-bottom: 20px;
+    }
+
+    #speedScale {
+        width: 150px;
+    }
+}

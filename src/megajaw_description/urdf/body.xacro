@@ -120,10 +120,6 @@
             <geometry>
                 <sphere radius="${caster_radius}" />
             </geometry>
-            <friction>
-                <friction_coefficient>0.5</friction_coefficient>
-                <rolling_friction>0.1</rolling_friction>
-            </friction>
         </collision>
 
         <xacro:sphere_inertial m="${caster_mass}" r="${caster_radius}" o_xyz="0 0 0" o_rpy="0 0 0" />

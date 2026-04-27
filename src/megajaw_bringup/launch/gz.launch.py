@@ -15,7 +15,7 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     urdf_path = os.path.join(get_package_share_directory('megajaw_description'), 'urdf', 'megajaw.xacro.urdf')
-    world_file_path = os.path.join(get_package_share_directory('megajaw_bringup'), 'worlds', 'ai_training_world.sdf')
+    world_file_path = os.path.join(get_package_share_directory('megajaw_bringup'), 'worlds', 'simple_world.sdf')
     rviz_config = PathJoinSubstitution(
         [
             FindPackageShare('megajaw_bringup'),
@@ -50,7 +50,7 @@ def generate_launch_description():
     joint_state_broadcaster_spawner = Node(
         package='controller_manager',
         executable='spawner',
-        arguments=['joint_state_broadcaster'],
+        arguments=['joint_state_broadcaster', '--controller-manager-timeout', '50.0'],
     )
     
     # Controller
@@ -71,6 +71,7 @@ def generate_launch_description():
             robot_controllers,
             '--controller-ros-args',
             '-r /diff_drive_base_controller/cmd_vel:=/cmd_vel',
+            '--controller-manager-timeout', '50.0',
         ],
     )
     

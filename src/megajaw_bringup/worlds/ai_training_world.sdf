@@ -1,9 +1,9 @@
 <sdf version='1.10'>
   <world name='empty'>
     <physics name='1ms' type='ignored'>
-      <max_step_size>0.004</max_step_size>
-      <real_time_factor>0.5</real_time_factor>
-      <real_time_update_rate>250</real_time_update_rate>
+      <max_step_size>0.01</max_step_size>
+      <real_time_factor>0</real_time_factor>
+      <real_time_update_rate>100</real_time_update_rate>
     </physics>
 
     <plugin name="gz::sim::systems::SceneBroadcaster" filename="gz-sim-scene-broadcaster-system">
@@ -26,7 +26,7 @@
     <scene>
       <ambient>0.400000006 0.400000006 0.400000006 1</ambient>
       <background>0.699999988 0.699999988 0.699999988 1</background>
-      <shadows>true</shadows>
+      <shadows>false</shadows>
     </scene>
     <model name='ground_plane'>
       <static>true</static>
@@ -77,7 +77,7 @@
       <pose>0 0 0 0 0 0</pose>
       <self_collide>false</self_collide>
     </model>
-    <model name='OfficeChair'>
+    <!-- <model name='OfficeChair'>
       <static>true</static>
       <link name='base_link'>
         <visual name='visual'>
@@ -384,8 +384,8 @@
       </link>
       <pose>1.722639730858619 -3.9445773095804597 0 0 0 0</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='OfficeChair_0'>
+    </model> -->
+    <!-- <model name='OfficeChair_0'>
       <static>true</static>
       <link name='base_link'>
         <visual name='visual'>
@@ -692,8 +692,8 @@
       </link>
       <pose>2.1617801189422607 3.1333799362182617 0 0 0 2.3561944611298031</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='LampAndStand'>
+    </model> -->
+    <!-- <model name='LampAndStand'>
       <static>true</static>
       <link name='body'>
         <pose>0 0 0 0 0 0</pose>
@@ -727,8 +727,8 @@
       </link>
       <pose>1.5860766829629158 -2.6939197755552371 0 0 0 0</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='BedsideTable2'>
+    </model> -->
+    <!-- <model name='BedsideTable2'>
       <static>true</static>
       <link name='body'>
         <pose>0 0 0 0 0 0</pose>
@@ -762,8 +762,8 @@
       </link>
       <pose>-0.86144153676740021 -3.834880672312337 0 0 0 0</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='Reflective table'>
+    </model> -->
+    <!-- <model name='Reflective table'>
       <static>true</static>
       <link name='link'>
         <pose>0 0 0 3.1415899999999999 0.0015926499999999999 3.1415899999999999</pose>
@@ -813,8 +813,8 @@
       <pose>-0.79624098539352417 0 -4.4183199722317881e-20 -2.6535864374336721e-06
         -3.5827571551921904e-09 -1.5707936774313411</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='Fridge'>
+    </model> -->
+    <!-- <model name='Fridge'>
       <static>true</static>
       <link name='body'>
         <pose>0 0 0 0 0 0</pose>
@@ -848,8 +848,8 @@
       </link>
       <pose>-3.428149938583374 -3.8691399097442627 0 0 0 -3.1415926535897931</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='Fridge_0'>
+    </model> -->
+    <!-- <model name='Fridge_0'>
       <static>true</static>
       <link name='body'>
         <pose>0 0 0 0 0 0</pose>
@@ -883,8 +883,8 @@
       </link>
       <pose>-4.5574800657522951 1.4978732587455605 0 0 0 0</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='OfficeChair_1'>
+    </model> -->
+    <!-- <model name='OfficeChair_1'>
       <static>true</static>
       <link name='base_link'>
         <visual name='visual'>
@@ -1191,8 +1191,8 @@
       </link>
       <pose>-0.8518674582214194 -1.927891054512846 0 0 0 0</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='OfficeChair_2'>
+    </model> -->
+    <!-- <model name='OfficeChair_2'>
       <static>true</static>
       <link name='base_link'>
         <visual name='visual'>
@@ -1499,8 +1499,8 @@
       </link>
       <pose>-0.80356299877166748 0.54514998197555542 0 0 0 3.141588150025779</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='RedWallet'>
+    </model> -->
+    <!-- <model name='RedWallet'>
       <static>true</static>
       <link name='link'>
         <visual name='visual'>
@@ -1542,8 +1542,8 @@
       <pose>-2.037559986114502 -1.0386500358581543 0 0.78886408933392838 4.3929308468637642e-08
         1.1619900031556363</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='LeatherWalletForMenUnfolded02'>
+    </model> -->
+    <!-- <model name='LeatherWalletForMenUnfolded02'>
       <static>true</static>
       <link name='link'>
         <inertial>
@@ -1585,8 +1585,8 @@
       </link>
       <pose>-2.4533200263977051 -3.938892126083374 0.15243752300739288 -0.53059397946687759 0 0</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='Wallet1'>
+    </model> -->
+    <!-- <model name='Wallet1'>
       <static>true</static>
       <link name='link'>
         <inertial>
@@ -1627,8 +1627,8 @@
       </link>
       <pose>-2.412790060043335 -2.2108399868011475 0 0.76395290658101633 0 0</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='Wallet2'>
+    </model> -->
+    <!-- <model name='Wallet2'>
       <static>true</static>
       <link name='link'>
         <inertial>
@@ -1669,8 +1669,8 @@
       </link>
       <pose>-0.028303405269980431 -3.0626199245452881 0 0 0 0</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='BrownLeatherWallet'>
+    </model> -->
+    <!-- <model name='BrownLeatherWallet'>
       <static>true</static>
       <link name='link'>
         <inertial>
@@ -1712,8 +1712,8 @@
       <pose>-2.1662600040435791 0.57658898830413818 0.080615997314453125 0.67773087151493538
         -0.36356287540055987 0.41600860662017436</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='OldWallet'>
+    </model> -->
+    <!-- <model name='OldWallet'>
       <static>true</static>
       <link name='link'>
         <inertial>
@@ -1754,8 +1754,8 @@
       </link>
       <pose>-1.1641699075698853 -2.7022500038146973 0 0 0 0</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='RidgeWallet'>
+    </model> -->
+    <!-- <model name='RidgeWallet'>
       <static>true</static>
       <link name='link'>
         <inertial>
@@ -1796,8 +1796,8 @@
       </link>
       <pose>-1.5100500583648682 -4.6400399208068848 0.089834295213222504 0 0 0</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='RidgeWallet_1'>
+    </model> -->
+    <!-- <model name='RidgeWallet_1'>
       <static>true</static>
       <link name='link'>
         <inertial>
@@ -1835,8 +1835,8 @@
       </link>
       <pose>-3.0485116407896773 -3.3380228635333231 0.089834302663803101 0 0 0</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='LeatherWalletForMenUnfolded02_1'>
+    </model> -->
+    <!-- <model name='LeatherWalletForMenUnfolded02_1'>
       <static>true</static>
       <link name='link'>
         <inertial>
@@ -1875,8 +1875,8 @@
       </link>
       <pose>0.12026124380416858 -4.5302427030687484 0.17309799790382385 -0.53059397946687759 0 0</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='LeatherWalletForMenUnfolded02_2'>
+    </model> -->
+    <!-- <model name='LeatherWalletForMenUnfolded02_2'>
       <static>true</static>
       <link name='link'>
         <inertial>
@@ -1915,8 +1915,8 @@
       </link>
       <pose>-1.2770791086506268 -0.71882919689295854 0.15243799984455109 -0.53059397946687759 0 0</pose>
       <self_collide>false</self_collide>
-    </model>
-    <model name='RidgeWallet_1_1'>
+    </model> -->
+    <!-- <model name='RidgeWallet_1_1'>
       <static>true</static>
       <link name='link'>
         <inertial>
@@ -1954,7 +1954,7 @@
       </link>
       <pose>0.90708657339598364 -1.0118197462685501 0.089834302663803101 0 0 0</pose>
       <self_collide>false</self_collide>
-    </model>
+    </model> -->
     <light name='sun' type='directional'>
       <pose>0 0 10 0 0 0</pose>
       <cast_shadows>true</cast_shadows>

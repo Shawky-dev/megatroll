@@ -36,5 +36,36 @@
         </sensor>
     </gazebo>
 
+    <!-- frictions -->
+    <gazebo reference="left_wheel_link">
+        <mu1>1.0</mu1>   <!-- longitudinal friction -->
+        <mu2>1.0</mu2>   <!-- lateral friction -->
+        <fdir1>0 0 1</fdir1>  <!-- direction of mu1 (along wheel axis) -->
+        <material>Gazebo/Black</material>
+
+        <soft_contact>
+            <soft_cfm>0.001</soft_cfm>
+            <soft_erp>0.2</soft_erp>
+        </soft_contact>
+    </gazebo>
+
+    <gazebo reference="right_wheel_link">
+        <mu1>1.0</mu1>   <!-- longitudinal friction -->
+        <mu2>1.0</mu2>   <!-- lateral friction -->
+        <fdir1>0 0 1</fdir1>  <!-- direction of mu1 (along wheel axis) -->
+        <material>Gazebo/Black</material>
+
+        <soft_contact>
+            <soft_cfm>0.001</soft_cfm>
+            <soft_erp>0.2</soft_erp>
+        </soft_contact>
+    </gazebo>
+
+    <gazebo reference="caster_link">
+        <mu1>0.01</mu1>
+        <mu2>0.01</mu2>
+        <material>Gazebo/Gray</material>
+    </gazebo>
+
 
 </robot>
