@@ -135,18 +135,26 @@ def generate_launch_description():
                                        'launch',
                                        'gz_sim.launch.py'])]),
             launch_arguments=[('gz_args', [' -r -v 1 ', world_file_path])]),
+        # RegisterEventHandler(
+        #     event_handler=OnProcessExit(
+        #         target_action=gz_spawn_entity,
+        #         on_exit=[joint_state_broadcaster_spawner],
+        #     )
+        # ),
+        
         RegisterEventHandler(
             event_handler=OnProcessExit(
                 target_action=gz_spawn_entity,
-                on_exit=[joint_state_broadcaster_spawner],
-            )
-        ),
-        RegisterEventHandler(
-            event_handler=OnProcessExit(
-                target_action=joint_state_broadcaster_spawner,
                 on_exit=[diff_drive_base_controller_spawner],
             )
         ),
+        
+        # RegisterEventHandler(
+        #     event_handler=OnProcessExit(
+        #         target_action=joint_state_broadcaster_spawner,
+        #         on_exit=[diff_drive_base_controller_spawner],
+        #     )
+        # ),
         
         # Launch Arguments
         DeclareLaunchArgument(
