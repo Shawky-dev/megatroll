@@ -1,0 +1,8 @@
+<library path="megajaw_hardware">
+  <class name="megajaw_hardware/MegaJawHardware" 
+         type="megajaw_hardware::MegaJawHardware" 
+         base_class_type="hardware_interface::SystemInterface">
+    <description>MegaJaw Hardware Interface</description>
+  </class>
+</library>
+
