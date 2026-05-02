@@ -37,10 +37,10 @@ void MotorDriver::setRightMotor(float speedPerc) {
 
 void MotorDriver::setMotors(float speedPerc, int pinA, int pinB) {
     if (speedPerc < -1) {
-        std::cout << "Warning: speedPerc can't be below -1, got " << speedPerc << std::endl;
+        // std::cout << "Warning: speedPerc can't be below -1, got " << speedPerc << std::endl;
         speedPerc = -1;
     } else if(speedPerc > 1) {
-        std::cout << "Warning: speedPerc can't be above 1, got " << speedPerc << std::endl;
+        // std::cout << "Warning: speedPerc can't be above 1, got " << speedPerc << std::endl;
         speedPerc = 1;
     }
 

@@ -3,10 +3,10 @@
     <ros2_control name="MegaJawHardware" type="system">
         <hardware>
             <plugin>megajaw_hardware/MegaJawHardware</plugin>
-            <param name="left_wheel_pin_a">23</param>
-            <param name="left_wheel_pin_b">24</param>
-            <param name="right_wheel_pin_a">23</param>
-            <param name="right_wheel_pin_b">24</param>
+	    <param name="left_wheel_pin_a">5</param>
+            <param name="left_wheel_pin_b">6</param>
+            <param name="right_wheel_pin_a">26</param>
+            <param name="right_wheel_pin_b">19</param>
         </hardware>
         <joint name="left_wheel_base_joint">
             <command_interface name="velocity"/>
