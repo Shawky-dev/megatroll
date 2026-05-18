@@ -1,0 +1,10 @@
+<library path="megajaw_uart">
+  <class
+    name="megajaw_uart/MegaJawUartHardware"
+    type="megajaw_uart::MegaJawUartHardware"
+    base_class_type="hardware_interface::SystemInterface">
+    <description>
+      UART hardware interface — sends M,left,right\n to STM32 over /dev/ttyAMA0
+    </description>
+  </class>
+</library>

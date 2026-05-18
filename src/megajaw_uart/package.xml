@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>megajaw_uart</name>
+  <version>0.0.1</version>
+  <description>UART hardware interface for MegaJaw — talks to STM32 over GPIO serial</description>
+  <maintainer email="you@example.com">you</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>hardware_interface</depend>
+  <depend>pluginlib</depend>
+  <depend>rclcpp</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+    <hardware_interface plugin="${prefix}/megajaw_uart_plugin.xml"/>
+  </export>
+</package>
