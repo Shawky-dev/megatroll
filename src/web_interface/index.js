@@ -1,228 +1,320 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// ROS2 Differential Drive Joystick Controller
-//
-// Mixing algorithm (ImpulseAdventure / classic differential steering):
-//   raw_left  = Y + X
-//   raw_right = Y - X
-//   Then normalize: if either exceeds ±1, divide BOTH by the larger magnitude.
-//   This preserves the turn ratio at full throttle instead of clipping one side.
-//
-// The joystick sends left/right motor PWM directly as a custom UART packet
-// via the ROS node. angular/linear in TwistStamped carry the motor values.
-// ─────────────────────────────────────────────────────────────────────────────
+// ROS 2 browser joystick for a simple differential-drive car.
+// The browser publishes normal cmd_vel values:
+//   linear.x  = forward/back command
+//   angular.z = left/right turn command
 
-// ─── Config ──────────────────────────────────────────────────────────────────
 const ROS_URL = 'ws://zeyadcodepi.local:9090';
-const PUBLISH_HZ = 20;      // send rate in Hz
+const PUBLISH_HZ = 20;
 const RECONNECT_MS = 2000;
-const STOP_DELAY = 100;     // ms after release before sending stop
+const ZERO_BURST_COUNT = 4;
+const DEAD_ZONE = 0.06;
+const EXPO = 1.7;
 
-// Dead zone: ignore joystick inputs smaller than this (normalized 0-1).
-// Prevents motor buzz when the stick rests slightly off-center.
-const DEAD_ZONE = 0.05;
-
-// Expo curve exponent. 1.0 = linear, 2.0 = quadratic (recommended).
-// Makes low-speed control finer without reducing max speed.
-const EXPO = 2.0;
-
-// Pivot-Y limit: when |Y| is below this threshold (0-1) and |X| is non-zero,
-// the robot pivots in place (one motor fwd, one rev).
-// Above this threshold it arc-turns instead.
-// 0.0 = always arc, 1.0 = always pivot. ~0.2 is a good starting point.
-const PIVOT_Y_LIMIT = 0.2;
-
-// ─── DOM ─────────────────────────────────────────────────────────────────────
 const statusDiv = document.getElementById('statusMsg');
 const canvas = document.getElementById('joystickCanvas');
 const speedSlider = document.getElementById('speedScale');
+const speedValue = document.getElementById('speedValue');
 const linearOut = document.getElementById('linearVal');
 const angularOut = document.getElementById('angularVal');
+const leftOut = document.getElementById('leftVal');
+const rightOut = document.getElementById('rightVal');
 
-let speedScale = parseFloat(speedSlider.value);
-speedSlider.addEventListener('input', e => { speedScale = parseFloat(e.target.value); });
-
-// ─── ROS2 ────────────────────────────────────────────────────────────────────
-const ros = new ROSLIB.Ros({ url: ROS_URL });
+let speedScale = Number(speedSlider.value);
 let reconnectTimer = null;
+let publishTimer = null;
+let activePointerId = null;
+let zeroBurstRemaining = ZERO_BURST_COUNT;
+let joyX = 0;
+let joyY = 0;
+
+const ros = new ROSLIB.Ros({ url: ROS_URL });
+const cmdVelTopic = new ROSLIB.Topic({
+    ros,
+    name: '/cmd_vel',
+    messageType: 'geometry_msgs/TwistStamped',
+});
+
+const ctx = canvas.getContext('2d');
+const view = {
+    size: 0,
+    cx: 0,
+    cy: 0,
+    maxR: 0,
+    knobR: 0,
+};
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function shapeAxis(value) {
+    const magnitude = Math.abs(value);
+    if (magnitude < DEAD_ZONE) return 0;
+
+    const normalized = (magnitude - DEAD_ZONE) / (1 - DEAD_ZONE);
+    return Math.sign(value) * Math.pow(normalized, EXPO);
+}
+
+function getCommand() {
+    const linear = shapeAxis(joyY) * speedScale;
+    const angular = -shapeAxis(joyX) * speedScale;
+    return {
+        linear: clamp(linear, -1, 1),
+        angular: clamp(angular, -1, 1),
+    };
+}
+
+function previewWheelMix(linear, angular) {
+    let left = linear - angular;
+    let right = linear + angular;
+    const maxMag = Math.max(1, Math.abs(left), Math.abs(right));
+    return { left: left / maxMag, right: right / maxMag };
+}
+
+function setStatus(kind, text) {
+    statusDiv.className = `status ${kind}`;
+    statusDiv.textContent = text;
+}
 
 function setConnected(ok) {
-    canvas.style.opacity = ok ? '1' : '0.45';
-    canvas.style.pointerEvents = ok ? 'auto' : 'none';
+    canvas.classList.toggle('is-disabled', !ok);
+
     if (ok) {
-        clearInterval(reconnectTimer); reconnectTimer = null;
-        statusDiv.textContent = '✅ Connected'; statusDiv.className = 'connected';
-    } else if (!reconnectTimer) {
-        reconnectTimer = setInterval(() => ros.connect(ROS_URL), RECONNECT_MS);
+        if (reconnectTimer) {
+            clearInterval(reconnectTimer);
+            reconnectTimer = null;
+        }
+        setStatus('connected', 'Connected');
+        startPublishing();
+        return;
+    }
+
+    activePointerId = null;
+    joyX = 0;
+    joyY = 0;
+    drawJoystick();
+    stopPublishing();
+
+    if (!reconnectTimer) {
+        reconnectTimer = setInterval(() => {
+            if (!ros.isConnected) ros.connect(ROS_URL);
+        }, RECONNECT_MS);
     }
 }
 
 ros.on('connection', () => setConnected(true));
-ros.on('error', err => { statusDiv.textContent = `❌ ${err}`; statusDiv.className = 'error'; setConnected(false); });
-ros.on('close', () => { statusDiv.textContent = '⚠️ Reconnecting…'; statusDiv.className = 'disconnected'; setConnected(false); });
-
-const cmdVelTopic = new ROSLIB.Topic({
-    ros, name: '/cmd_vel', messageType: 'geometry_msgs/TwistStamped',
+ros.on('error', (err) => {
+    setStatus('error', `Connection error: ${err?.message || err || 'unknown'}`);
+    setConnected(false);
+});
+ros.on('close', () => {
+    setStatus('disconnected', 'Disconnected. Reconnecting...');
+    setConnected(false);
 });
 
-// Publish left/right motor values (-1…+1) packed into linear.x and angular.z.
-// The ROS node on the Pi unpacks these and forwards them as raw PWM over UART.
-function publishMotors(left, right) {
+function publishCmd(linear, angular) {
     if (!ros.isConnected) return;
+
     cmdVelTopic.publish(new ROSLIB.Message({
         header: { stamp: { sec: 0, nanosec: 0 }, frame_id: 'base_link' },
         twist: {
-            linear: { x: left, y: 0, z: 0 },
-            angular: { x: 0, y: 0, z: right },
+            linear: { x: linear, y: 0, z: 0 },
+            angular: { x: 0, y: 0, z: angular },
         },
     }));
-    if (linearOut) linearOut.textContent = (left * 100).toFixed(0);
-    if (angularOut) angularOut.textContent = (right * 100).toFixed(0);
 }
 
-// ─── Mixing ──────────────────────────────────────────────────────────────────
-// x: -1 (left) … +1 (right)
-// y: -1 (back) … +1 (forward)
-// Returns { left, right } each in -1…+1
-function mix(x, y) {
-    // 1. Dead zone — applied per axis before mixing
-    const dx = Math.abs(x) < DEAD_ZONE ? 0 : Math.sign(x) * (Math.abs(x) - DEAD_ZONE) / (1 - DEAD_ZONE);
-    const dy = Math.abs(y) < DEAD_ZONE ? 0 : Math.sign(y) * (Math.abs(y) - DEAD_ZONE) / (1 - DEAD_ZONE);
+function updateReadout(linear, angular) {
+    const { left, right } = previewWheelMix(linear, angular);
+    linearOut.textContent = linear.toFixed(2);
+    angularOut.textContent = angular.toFixed(2);
+    leftOut.textContent = `${Math.round(left * 100)}%`;
+    rightOut.textContent = `${Math.round(right * 100)}%`;
+}
 
-    // 2. Expo curve — finer low-speed control
-    const ex = Math.sign(dx) * Math.pow(Math.abs(dx), EXPO);
-    const ey = Math.sign(dy) * Math.pow(Math.abs(dy), EXPO);
+function publishCurrentCommand() {
+    const isActive = activePointerId !== null;
+    const { linear, angular } = isActive ? getCommand() : { linear: 0, angular: 0 };
 
-    // 3. Pivot vs arc mixing
-    // When barely moving forward (|ey| < PIVOT_Y_LIMIT) and turning,
-    // blend toward a full pivot so the robot can spin in place cleanly.
-    let left, right;
-    const pivotBlend = Math.max(0, 1 - Math.abs(ey) / PIVOT_Y_LIMIT); // 1 at y=0, 0 at y=PIVOT_Y_LIMIT
-
-    if (Math.abs(ey) < PIVOT_Y_LIMIT && Math.abs(ex) > 0.01) {
-        // Pivot in place: left and right spin opposite directions
-        const pivot = ex * pivotBlend;
-        const arc_l = ey + ex * (1 - pivotBlend);
-        const arc_r = ey - ex * (1 - pivotBlend);
-        left = pivot + arc_l * (1 - pivotBlend);
-        right = -pivot + arc_r * (1 - pivotBlend);
-    } else {
-        // Standard differential mixing
-        left = ey + ex;
-        right = ey - ex;
+    if (!isActive && zeroBurstRemaining <= 0) {
+        updateReadout(0, 0);
+        return;
     }
 
-    // 4. Normalize — if either side exceeds ±1, scale BOTH down by the same
-    //    factor so the turn ratio is preserved (not clipped).
-    const maxVal = Math.max(Math.abs(left), Math.abs(right));
-    if (maxVal > 1.0) { left /= maxVal; right /= maxVal; }
+    publishCmd(linear, angular);
+    updateReadout(linear, angular);
 
-    // 5. Apply speed scale
-    return { left: left * speedScale, right: right * speedScale };
+    if (!isActive) zeroBurstRemaining -= 1;
 }
-
-// ─── Joystick canvas ─────────────────────────────────────────────────────────
-const SIZE = canvas.width;
-const CX = SIZE / 2, CY = SIZE / 2;
-const MAX_R = SIZE * 0.32;
-const KNOB_R = SIZE * 0.11;
-const ctx = canvas.getContext('2d');
-
-let joyX = 0, joyY = 0, isActive = false;
-
-function drawJoystick() {
-    ctx.clearRect(0, 0, SIZE, SIZE);
-
-    // Base
-    ctx.beginPath(); ctx.arc(CX, CY, MAX_R + 6, 0, Math.PI * 2);
-    ctx.fillStyle = '#1a2630'; ctx.fill();
-    ctx.beginPath(); ctx.arc(CX, CY, MAX_R, 0, Math.PI * 2);
-    ctx.fillStyle = '#2c3e4a'; ctx.fill();
-    ctx.strokeStyle = '#4a6070'; ctx.lineWidth = 1.5; ctx.stroke();
-
-    // Crosshairs
-    ctx.setLineDash([4, 6]); ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(CX - MAX_R, CY); ctx.lineTo(CX + MAX_R, CY);
-    ctx.moveTo(CX, CY - MAX_R); ctx.lineTo(CX, CY + MAX_R);
-    ctx.stroke(); ctx.setLineDash([]);
-
-    // Knob — clamped to circle
-    let kx = CX + joyX * MAX_R;
-    let ky = CY - joyY * MAX_R;
-    const d = Math.hypot(kx - CX, ky - CY);
-    if (d > MAX_R) { kx = CX + (kx - CX) / d * MAX_R; ky = CY + (ky - CY) / d * MAX_R; }
-
-    if (isActive) { ctx.shadowColor = '#e67e22aa'; ctx.shadowBlur = 18; }
-    ctx.beginPath(); ctx.arc(kx, ky, KNOB_R, 0, Math.PI * 2);
-    ctx.fillStyle = '#c0622a'; ctx.fill();
-    ctx.beginPath(); ctx.arc(kx, ky, KNOB_R * 0.78, 0, Math.PI * 2);
-    ctx.fillStyle = '#e67e22'; ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Center dot
-    ctx.beginPath(); ctx.arc(CX, CY, 3, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fill();
-}
-
-function toNorm(clientX, clientY) {
-    const r = canvas.getBoundingClientRect();
-    let dx = (clientX - r.left) * (SIZE / r.width) - CX;
-    let dy = (clientY - r.top) * (SIZE / r.height) - CY;
-    const dist = Math.hypot(dx, dy);
-    if (dist > MAX_R) { dx = dx / dist * MAX_R; dy = dy / dist * MAX_R; }
-    return { x: dx / MAX_R, y: -dy / MAX_R };
-}
-
-// ─── Publish loop ────────────────────────────────────────────────────────────
-let publishTimer = null, stopTimer = null;
 
 function startPublishing() {
     if (publishTimer) return;
-    publishTimer = setInterval(() => {
-        if (!isActive) return;
-        const { left, right } = mix(joyX, joyY);
-        publishMotors(left, right);
-    }, 1000 / PUBLISH_HZ);
+    publishTimer = setInterval(publishCurrentCommand, 1000 / PUBLISH_HZ);
+    publishCurrentCommand();
 }
 
 function stopPublishing() {
-    if (publishTimer) { clearInterval(publishTimer); publishTimer = null; }
+    if (!publishTimer) return;
+    clearInterval(publishTimer);
+    publishTimer = null;
+    updateReadout(0, 0);
 }
 
-// ─── Events ──────────────────────────────────────────────────────────────────
-function onStart(e) {
-    if (!ros.isConnected) return;
-    e.preventDefault();
-    clearTimeout(stopTimer); stopTimer = null;
-    isActive = true;
-    const pt = e.touches ? e.touches[0] : e;
-    ({ x: joyX, y: joyY } = toNorm(pt.clientX, pt.clientY));
-    drawJoystick(); startPublishing();
-}
+function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
 
-function onMove(e) {
-    if (!isActive) return;
-    e.preventDefault();
-    const pt = e.touches ? e.touches[0] : e;
-    ({ x: joyX, y: joyY } = toNorm(pt.clientX, pt.clientY));
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    view.size = Math.min(rect.width, rect.height);
+    view.cx = rect.width / 2;
+    view.cy = rect.height / 2;
+    view.maxR = view.size * 0.34;
+    view.knobR = view.size * 0.12;
+
     drawJoystick();
 }
 
-function onEnd(e) {
-    if (!isActive) return;
-    e.preventDefault();
-    isActive = false; joyX = 0; joyY = 0;
-    drawJoystick(); stopPublishing();
-    stopTimer = setTimeout(() => { publishMotors(0, 0); stopTimer = null; }, STOP_DELAY);
+function drawRing(radius, color, width = 1) {
+    ctx.beginPath();
+    ctx.arc(view.cx, view.cy, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.stroke();
 }
 
-canvas.addEventListener('mousedown', onStart);
-window.addEventListener('mousemove', onMove);
-window.addEventListener('mouseup', onEnd);
-canvas.addEventListener('touchstart', onStart, { passive: false });
-window.addEventListener('touchmove', onMove, { passive: false });
-window.addEventListener('touchend', onEnd, { passive: false });
+function drawJoystick() {
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, rect.width, rect.height);
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
+    const gradient = ctx.createRadialGradient(
+        view.cx,
+        view.cy,
+        view.knobR,
+        view.cx,
+        view.cy,
+        view.maxR + 42,
+    );
+    gradient.addColorStop(0, '#28394a');
+    gradient.addColorStop(1, '#101820');
+
+    ctx.beginPath();
+    ctx.arc(view.cx, view.cy, view.maxR + 42, 0, Math.PI * 2);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    drawRing(view.maxR, 'rgba(148, 163, 184, 0.38)', 2);
+    drawRing(view.maxR * 0.55, 'rgba(148, 163, 184, 0.18)', 1);
+
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.28)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(view.cx - view.maxR, view.cy);
+    ctx.lineTo(view.cx + view.maxR, view.cy);
+    ctx.moveTo(view.cx, view.cy - view.maxR);
+    ctx.lineTo(view.cx, view.cy + view.maxR);
+    ctx.stroke();
+
+    const knobX = view.cx + joyX * view.maxR;
+    const knobY = view.cy - joyY * view.maxR;
+    const isActive = activePointerId !== null;
+
+    if (isActive) {
+        ctx.beginPath();
+        ctx.moveTo(view.cx, view.cy);
+        ctx.lineTo(knobX, knobY);
+        ctx.strokeStyle = 'rgba(45, 212, 191, 0.55)';
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+    }
+
+    ctx.shadowColor = isActive ? 'rgba(45, 212, 191, 0.45)' : 'rgba(0, 0, 0, 0.35)';
+    ctx.shadowBlur = isActive ? 24 : 14;
+    ctx.beginPath();
+    ctx.arc(knobX, knobY, view.knobR, 0, Math.PI * 2);
+    ctx.fillStyle = isActive ? '#2dd4bf' : '#e2e8f0';
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    ctx.beginPath();
+    ctx.arc(knobX, knobY, view.knobR * 0.42, 0, Math.PI * 2);
+    ctx.fillStyle = isActive ? '#0f766e' : '#64748b';
+    ctx.fill();
+}
+
+function pointerToJoystick(event) {
+    const rect = canvas.getBoundingClientRect();
+    let dx = event.clientX - rect.left - view.cx;
+    let dy = event.clientY - rect.top - view.cy;
+    const distance = Math.hypot(dx, dy);
+
+    if (distance > view.maxR) {
+        dx = (dx / distance) * view.maxR;
+        dy = (dy / distance) * view.maxR;
+    }
+
+    return {
+        x: dx / view.maxR,
+        y: -dy / view.maxR,
+    };
+}
+
+function releaseJoystick() {
+    activePointerId = null;
+    joyX = 0;
+    joyY = 0;
+    zeroBurstRemaining = ZERO_BURST_COUNT;
+    publishCmd(0, 0);
+    updateReadout(0, 0);
+    drawJoystick();
+}
+
+canvas.addEventListener('pointerdown', (event) => {
+    if (!ros.isConnected) return;
+
+    event.preventDefault();
+    activePointerId = event.pointerId;
+    canvas.setPointerCapture(event.pointerId);
+    zeroBurstRemaining = ZERO_BURST_COUNT;
+    ({ x: joyX, y: joyY } = pointerToJoystick(event));
+    drawJoystick();
+    publishCurrentCommand();
+});
+
+canvas.addEventListener('pointermove', (event) => {
+    if (event.pointerId !== activePointerId) return;
+
+    event.preventDefault();
+    ({ x: joyX, y: joyY } = pointerToJoystick(event));
+    drawJoystick();
+});
+
+canvas.addEventListener('pointerup', (event) => {
+    if (event.pointerId !== activePointerId) return;
+    event.preventDefault();
+    releaseJoystick();
+});
+
+canvas.addEventListener('pointercancel', (event) => {
+    if (event.pointerId !== activePointerId) return;
+    releaseJoystick();
+});
+
+canvas.addEventListener('lostpointercapture', () => {
+    if (activePointerId !== null) releaseJoystick();
+});
+
+speedSlider.addEventListener('input', (event) => {
+    speedScale = Number(event.target.value);
+    speedValue.textContent = `${Math.round(speedScale * 100)}%`;
+});
+
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('blur', releaseJoystick);
+
 setConnected(false);
-drawJoystick();
+speedValue.textContent = `${Math.round(speedScale * 100)}%`;
+resizeCanvas();

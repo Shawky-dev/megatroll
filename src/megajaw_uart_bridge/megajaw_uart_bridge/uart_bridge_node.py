@@ -1,130 +1,122 @@
-#!/usr/bin/env python3  
-import rclpy  
-from rclpy.node import Node  
-# from geometry_msgs.msg import Twist, TwistStamped  
+#!/usr/bin/env python3
+import struct
+import time
+
+import rclpy
+import serial
 from geometry_msgs.msg import TwistStamped
-import serial  
-import struct  
-import time  
-  
-class UARTBridgeNode(Node):  
-    def __init__(self):  
-        super().__init__('uart_bridge_node')  
-          
-        # UART configuration  
-        self.serial_port = '/dev/ttyAMA0'  # Change if needed  
-        self.baudrate = 115200  
-          
-        # Robot parameters  
-        self.wheel_separation = 0.18  # meters  
-        self.wheel_radius = 0.03      # meters (adjust based on your wheels)  
-          
-        # Velocity limits  
-        self.max_linear_vel = 1.0     # m/s  
-        self.max_angular_vel = 1.0    # rad/s  
-          
-        # Timeout for stopping (seconds)  
-        self.cmd_timeout = 0.5  
-        self.last_cmd_time = time.time()  
-          
-        try:  
-            self.ser = serial.Serial(self.serial_port, self.baudrate, timeout=0.1)  
-            self.get_logger().info(f'UART connected to {self.serial_port}')  
-        except serial.SerialException as e:  
-            self.get_logger().error(f'Failed to connect to UART: {e}')  
-            self.ser = None  
-          
-        # # Subscribe to cmd_vel (support both Twist and TwistStamped)  
-        # self.twist_sub = self.create_subscription(  
-        #     Twist,  
-        #     '/cmd_vel',  
-        #     self.twist_callback,  
-        #     10  
-        # )  
-          
-        self.twist_stamped_sub = self.create_subscription(  
-            TwistStamped,  
-            '/cmd_vel',  
-            self.twist_stamped_callback,  
-            10  
-        )  
-          
-        # Timer for timeout check (20Hz)  
-        self.timer = self.create_timer(0.05, self.timer_callback)  
-          
-        self.get_logger().info('UART Bridge Node started')  
-  
-    # def twist_callback(self, msg):  
-    #     self.process_twist(msg)  
-  
-    def twist_stamped_callback(self, msg):  
-        self.process_twist(msg.twist)  
-  
-    def process_twist(self, twist):  
-        self.last_cmd_time = time.time()  
-          
-        # Extract velocities  
-        linear_x = twist.linear.x  
-        angular_z = twist.angular.z  
-          
-        # Clamp velocities  
-        linear_x = max(-self.max_linear_vel, min(self.max_linear_vel, linear_x))  
-        angular_z = max(-self.max_angular_vel, min(self.max_angular_vel, angular_z))  
-          
-        # Differential drive kinematics  
-        # v_left = (linear_x - angular_z * wheel_separation / 2) / wheel_radius  
-        # v_right = (linear_x + angular_z * wheel_separation / 2) / wheel_radius  
-          
-        left_wheel_vel = (linear_x - angular_z * self.wheel_separation / 2.0) / self.wheel_radius  
-        right_wheel_vel = (linear_x + angular_z * self.wheel_separation / 2.0) / self.wheel_radius  
-          
-        # Convert to PWM percentage (-100 to 100)  
-        left_pwm = int(left_wheel_vel * 50)  # Adjust scaling factor as needed  
-        right_pwm = int(right_wheel_vel * 50)  
-          
-        # Clamp PWM  
-        left_pwm = max(-100, min(100, left_pwm))  
-        right_pwm = max(-100, min(100, right_pwm))  
-          
-        self.send_to_stm32(left_pwm, right_pwm)  
-          
-        self.get_logger().debug(f'Linear: {linear_x:.3f}, Angular: {angular_z:.3f}, '  
-                                f'Left PWM: {left_pwm}, Right PWM: {right_pwm}')  
-  
-    def send_to_stm32(self, left_pwm, right_pwm):  
-        if self.ser is None:  
-            return  
-          
-        # Send as binary: header (2 bytes) + left_pwm (2 bytes) + right_pwm (2 bytes)  
-        # Header: 0xAA, 0x55  
-        # PWM values: signed 16-bit integers  
-        try:  
-            message = struct.pack('<BBhh', 0xAA, 0x55, left_pwm, right_pwm)  
-            self.ser.write(message)  
-        except serial.SerialException as e:  
-            self.get_logger().error(f'UART write error: {e}')  
-  
-    def timer_callback(self):  
-        # Check for timeout and send stop command  
-        if time.time() - self.last_cmd_time > self.cmd_timeout:  
-            self.send_to_stm32(0, 0)  
-  
-    def destroy_node(self):  
-        if self.ser:  
-            self.send_to_stm32(0, 0)  
-            self.ser.close()  
-        super().destroy_node()  
-  
-def main(args=None):  
-    rclpy.init(args=args)  
-    node = UARTBridgeNode()  
-    try:  
-        rclpy.spin(node)  
-    except KeyboardInterrupt:  
-        pass  
-    finally:  
-        node.destroy_node()  
-        rclpy.shutdown()  
-  
-if __name__ == '__main__':  
+from rclpy.node import Node
+
+
+class UARTBridgeNode(Node):
+    def __init__(self):
+        super().__init__('uart_bridge_node')
+
+        self.declare_parameter('serial_port', '/dev/ttyAMA0')
+        self.declare_parameter('baudrate', 115200)
+        self.declare_parameter('max_pwm', 100)
+        self.declare_parameter('cmd_timeout', 0.5)
+        self.declare_parameter('dead_zone', 0.02)
+
+        self.serial_port = self.get_parameter('serial_port').value
+        self.baudrate = int(self.get_parameter('baudrate').value)
+        self.max_pwm = int(self.get_parameter('max_pwm').value)
+        self.cmd_timeout = float(self.get_parameter('cmd_timeout').value)
+        self.dead_zone = float(self.get_parameter('dead_zone').value)
+
+        self.last_cmd_time = time.monotonic()
+        self.stopped = True
+
+        try:
+            self.ser = serial.Serial(self.serial_port, self.baudrate, timeout=0.1)
+            self.get_logger().info(f'UART connected to {self.serial_port}')
+        except serial.SerialException as exc:
+            self.ser = None
+            self.get_logger().error(f'Failed to connect to UART: {exc}')
+
+        self.create_subscription(TwistStamped, '/cmd_vel', self.twist_stamped_callback, 10)
+        self.create_timer(0.05, self.timer_callback)
+
+        self.get_logger().info('UART bridge node started')
+
+    def twist_stamped_callback(self, msg):
+        self.process_twist(msg.twist)
+
+    def process_twist(self, twist):
+        linear = self.clamp(float(twist.linear.x), -1.0, 1.0)
+        angular = self.clamp(float(twist.angular.z), -1.0, 1.0)
+
+        if abs(linear) < self.dead_zone:
+            linear = 0.0
+        if abs(angular) < self.dead_zone:
+            angular = 0.0
+
+        left, right = self.mix_differential(linear, angular)
+        self.send_to_stm32(left, right)
+
+        self.last_cmd_time = time.monotonic()
+        self.stopped = left == 0 and right == 0
+
+        self.get_logger().debug(
+            f'linear.x={linear:.2f}, angular.z={angular:.2f}, '
+            f'left_pwm={left}, right_pwm={right}'
+        )
+
+    def mix_differential(self, linear, angular):
+        left = linear - angular
+        right = linear + angular
+
+        max_magnitude = max(1.0, abs(left), abs(right))
+        left_pwm = round((left / max_magnitude) * self.max_pwm)
+        right_pwm = round((right / max_magnitude) * self.max_pwm)
+
+        return int(left_pwm), int(right_pwm)
+
+    @staticmethod
+    def clamp(value, minimum, maximum):
+        return max(minimum, min(maximum, value))
+
+    def send_to_stm32(self, left_pwm, right_pwm):
+        if self.ser is None:
+            return
+
+        left_pwm = int(self.clamp(left_pwm, -self.max_pwm, self.max_pwm))
+        right_pwm = int(self.clamp(right_pwm, -self.max_pwm, self.max_pwm))
+
+        try:
+            message = struct.pack('<BBhh', 0xAA, 0x55, left_pwm, right_pwm)
+            self.ser.write(message)
+        except serial.SerialException as exc:
+            self.get_logger().error(f'UART write error: {exc}')
+
+    def timer_callback(self):
+        if self.stopped:
+            return
+
+        if time.monotonic() - self.last_cmd_time > self.cmd_timeout:
+            self.send_to_stm32(0, 0)
+            self.stopped = True
+            self.get_logger().warn('cmd_vel timeout; sent motor stop')
+
+    def destroy_node(self):
+        self.send_to_stm32(0, 0)
+        if self.ser is not None:
+            self.ser.close()
+        super().destroy_node()
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = UARTBridgeNode()
+
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
     main()
