@@ -24,6 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'uart_bridge_node = megajaw_uart_bridge.uart_bridge_node:main',  
         ],
     },
 )
