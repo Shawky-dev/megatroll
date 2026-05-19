@@ -5,18 +5,18 @@ from std_msgs.msg import String
 import serial
 import time
 
-class UartTestNode(Node):
+class UartBlinkNode(Node):
     def __init__(self):
-        super().__init__('uart_test_node')
+        super().__init__('uart_blink_node')
         
-        # UART CONFIG
+        # UART Setup
         self.port = '/dev/ttyAMA0'
         self.baud = 115200
         
         try:
             self.ser = serial.Serial(self.port, self.baud, timeout=1)
-            time.sleep(2)  # Wait for STM32 to reset
-            self.get_logger().info(f'✅ UART connected: {self.port} @ {self.baud}')
+            time.sleep(2)  # Wait for STM32 to finish boot/reset
+            self.get_logger().info('✅ UART connected to STM32')
         except serial.SerialException as e:
             self.get_logger().error(f'❌ Failed to open UART: {e}')
             self.get_logger().error('💡 Fix: sudo usermod -a -G dialout $USER && reboot')
@@ -25,18 +25,16 @@ class UartTestNode(Node):
 
         # Subscribe to test topic
         self.sub = self.create_subscription(
-            String, '/uart_test', self.test_callback, 10
-        )
-        self.get_logger().info('📡 Ready! Publish to /uart_test with data: W, S, A, D, or X')
+            String, '/uart_test', self.cmd_callback, 10)
+        self.get_logger().info('📡 Ready! Publish "L" to /uart_test to blink STM32 LED')
 
-    def test_callback(self, msg):
-        if not self.ser or not self.ser.is_open:
-            self.get_logger().warn('UART not connected!')
-            return
-            
-        cmd = msg.data.encode('utf-8')
-        self.ser.write(cmd)
-        self.get_logger().info(f'📤 Sent to STM32: {cmd}')
+    def cmd_callback(self, msg):
+        if not self.ser: return
+        
+        cmd = msg.data.strip().upper()
+        if cmd == 'L':
+            self.ser.write(b'L')
+            self.get_logger().info('📤 Sent "L" → STM32 LED should blink!')
 
     def destroy_node(self):
         if self.ser and self.ser.is_open:
@@ -45,11 +43,11 @@ class UartTestNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = UartTestNode()
+    node = UartBlinkNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info('🛑 Shutting down...')
+        pass
     finally:
         node.destroy_node()
         rclpy.shutdown()
