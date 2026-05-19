@@ -1,6 +1,6 @@
 // ---------- ROS2 setup ----------
 const URL = 'ws://zeyadcodepi.local:9090' // ws://localhost:9090
-const ros = new ROSLIB.Ros({ url: URL});
+const ros = new ROSLIB.Ros({ url: URL });
 const statusDiv = document.getElementById('statusMsg');
 const canvas = document.getElementById('joystickCanvas');
 const speedSlider = document.getElementById('speedScale');
@@ -51,7 +51,7 @@ ros.on('close', () => {
 const cmdVelPub = new ROSLIB.Topic({
     ros: ros,
     name: '/cmd_vel',
-    messageType: 'geometry_msgs/TwistStamped'
+    messageType: 'geometry_msgs/Twist'
 });
 
 // ---------- Joystick parameters ----------
@@ -215,10 +215,8 @@ function startPublishing() {
 function publishTwist(linear, angular) {
     if (!ros.isConnected) return;
     const twist = new ROSLIB.Message({
-        twist: {
-            linear: { x: linear, y: 0, z: 0 },
-            angular: { x: 0, y: 0, z: angular },
-        }
+        linear: { x: linear, y: 0, z: 0 },
+        angular: { x: 0, y: 0, z: angular },
     });
     cmdVelPub.publish(twist);
 
