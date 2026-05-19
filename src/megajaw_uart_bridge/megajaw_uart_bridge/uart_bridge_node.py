@@ -15,9 +15,9 @@ class UARTBridgeNode(Node):
         self.declare_parameter('serial_port', '/dev/ttyAMA0')
         self.declare_parameter('baudrate', 115200)
         self.declare_parameter('max_pwm', 100)
-        self.declare_parameter('min_pwm', 30)
+        self.declare_parameter('min_pwm', 0)
         self.declare_parameter('cmd_timeout', 0.5)
-        self.declare_parameter('dead_zone', 0.02)
+        self.declare_parameter('dead_zone', 0.0)
 
         self.serial_port = self.get_parameter('serial_port').value
         self.baudrate = int(self.get_parameter('baudrate').value)
