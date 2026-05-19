@@ -1,239 +1,269 @@
-// ---------- ROS2 setup ----------
-const URL = 'ws://zeyadcodepi.local:9090' // ws://localhost:9090
-const ros = new ROSLIB.Ros({ url: URL});
+// ─────────────────────────────────────────────────────────────────────────────
+// ROS2 Joystick Controller
+// Publishes geometry_msgs/TwistStamped on /cmd_vel
+// PWM range sent: -100 … +100 (mapped from joystick position)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─── Config ──────────────────────────────────────────────────────────────────
+const ROS_URL = 'ws://zeyadcodepi.local:9090';
+const PUBLISH_HZ = 20;           // Hz — how often to send commands
+const RECONNECT_MS = 2000;         // ms between reconnect attempts
+const STOP_DELAY_MS = 100;          // ms after release before sending stop (debounce)
+
+// ─── DOM refs ────────────────────────────────────────────────────────────────
 const statusDiv = document.getElementById('statusMsg');
 const canvas = document.getElementById('joystickCanvas');
 const speedSlider = document.getElementById('speedScale');
+const linearOut = document.getElementById('linearVal');
+const angularOut = document.getElementById('angularVal');
 
-let reconnectInterval = null;
-const RECONNECT_DELAY = 2000; // 2 seconds
+// ─── ROS2 connection ─────────────────────────────────────────────────────────
+const ros = new ROSLIB.Ros({ url: ROS_URL });
+let reconnectTimer = null;
 
-function attemptReconnect() {
-    if (!ros.isConnected && !reconnectInterval) {
-        reconnectInterval = setInterval(() => {
-            console.log('Attempting to reconnect to ROS2...');
-            ros.connect(URL);
-        }, RECONNECT_DELAY);
-    }
-}
-
-function stopReconnectAttempts() {
-    if (reconnectInterval) {
-        clearInterval(reconnectInterval);
-        reconnectInterval = null;
+function setConnected(connected) {
+    if (connected) {
+        clearInterval(reconnectTimer);
+        reconnectTimer = null;
+        statusDiv.textContent = '✅ Connected';
+        statusDiv.className = 'connected';
+        canvas.style.opacity = '1';
+        canvas.style.pointerEvents = 'auto';
+    } else {
+        canvas.style.opacity = '0.45';
+        canvas.style.pointerEvents = 'none';
+        if (!reconnectTimer) {
+            reconnectTimer = setInterval(() => ros.connect(ROS_URL), RECONNECT_MS);
+        }
     }
 }
 
 ros.on('connection', () => {
-    stopReconnectAttempts();
-    statusDiv.innerHTML = '✅ ROS2 connected – joystick active';
-    statusDiv.classList.remove('error', 'disconnected');
-    canvas.style.opacity = '1';
-    canvas.style.pointerEvents = 'auto';
+    setConnected(true);
+    statusDiv.textContent = '✅ Connected';
 });
-
 ros.on('error', (err) => {
-    statusDiv.innerHTML = `❌ Error: ${err}`;
-    statusDiv.classList.add('error');
-    canvas.style.opacity = '0.5';
-    canvas.style.pointerEvents = 'none';
-    attemptReconnect();
+    statusDiv.textContent = `❌ Error: ${err}`;
+    statusDiv.className = 'error';
+    setConnected(false);
 });
-
 ros.on('close', () => {
-    statusDiv.innerHTML = '⚠️ Disconnected – reconnecting...';
-    statusDiv.classList.add('disconnected');
-    canvas.style.opacity = '0.5';
-    canvas.style.pointerEvents = 'none';
-    attemptReconnect();
+    statusDiv.textContent = '⚠️ Disconnected – reconnecting…';
+    statusDiv.className = 'disconnected';
+    setConnected(false);
 });
 
-const cmdVelPub = new ROSLIB.Topic({
-    ros: ros,
+// ─── Publisher ───────────────────────────────────────────────────────────────
+const cmdVelTopic = new ROSLIB.Topic({
+    ros,
     name: '/cmd_vel',
-    messageType: 'geometry_msgs/TwistStamped'
+    messageType: 'geometry_msgs/TwistStamped',
 });
-
-// ---------- Joystick parameters ----------
-const size = 250;
-const centerX = size / 2, centerY = size / 2;
-const maxRadius = 80;
-
-let active = false;
-let joyX = 0, joyY = 0;
-let animationId = null;
-let coastingTimeout = null;
-const COAST_DURATION = 5000; // 5 seconds of coasting after release
-
-let speedScale = parseFloat(speedSlider.value);
-
-speedSlider.addEventListener('input', (e) => {
-    speedScale = parseFloat(e.target.value);
-});
-
-const ctx = canvas.getContext('2d');
-
-// ---------- Draw joystick (knob & base) ----------
-function draw() {
-    ctx.clearRect(0, 0, size, size);
-    // outer ring
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, maxRadius + 8, 0, 2 * Math.PI);
-    ctx.fillStyle = '#1e2a32';
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, maxRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = '#3a4c5c';
-    ctx.fill();
-    ctx.strokeStyle = '#5d7a8c';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // crosshair lines
-    ctx.beginPath();
-    ctx.moveTo(centerX - maxRadius, centerY);
-    ctx.lineTo(centerX + maxRadius, centerY);
-    ctx.moveTo(centerX, centerY - maxRadius);
-    ctx.lineTo(centerX, centerY + maxRadius);
-    ctx.strokeStyle = '#ffffff30';
-    ctx.stroke();
-
-    // knob position
-    let knobX = centerX + joyX * maxRadius;
-    let knobY = centerY - joyY * maxRadius;
-    // limit to circle
-    const dx = knobX - centerX, dy = knobY - centerY;
-    const dist = Math.hypot(dx, dy);
-    if (dist > maxRadius) {
-        knobX = centerX + (dx / dist) * maxRadius;
-        knobY = centerY + (dy / dist) * maxRadius;
-    }
-    ctx.beginPath();
-    ctx.arc(knobX, knobY, 28, 0, 2 * Math.PI);
-    ctx.fillStyle = '#e67e22';
-    ctx.fill();
-    ctx.shadowBlur = 3;
-    ctx.beginPath();
-    ctx.arc(knobX, knobY, 22, 0, 2 * Math.PI);
-    ctx.fillStyle = '#f39c12';
-    ctx.fill();
-    ctx.shadowBlur = 0;
-}
-
-// ---------- Convert mouse/touch position to joystick normalized values ----------
-function getNormalizedCoords(clientX, clientY) {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    let canvasX = (clientX - rect.left) * scaleX;
-    let canvasY = (clientY - rect.top) * scaleY;
-    canvasX = Math.min(Math.max(canvasX, 0), size);
-    canvasY = Math.min(Math.max(canvasY, 0), size);
-    let dx = canvasX - centerX;
-    let dy = canvasY - centerY;
-    const dist = Math.hypot(dx, dy);
-    if (dist > maxRadius) {
-        dx = (dx / dist) * maxRadius;
-        dy = (dy / dist) * maxRadius;
-    }
-    let normX = dx / maxRadius;
-    let normY = dy / maxRadius;
-    normY = -normY;
-    return { x: normX, y: normY };
-}
-
-function handleStart(e) {
-    if (!ros.isConnected) return;
-    e.preventDefault();
-    active = true;
-
-    // Cancel any coasting timeout
-    if (coastingTimeout) {
-        clearTimeout(coastingTimeout);
-        coastingTimeout = null;
-    }
-
-    const point = e.touches ? e.touches[0] : e;
-    const { x, y } = getNormalizedCoords(point.clientX, point.clientY);
-    joyX = x;
-    joyY = y;
-    draw();
-    startPublishing();
-}
-
-function handleMove(e) {
-    if (!active) return;
-    e.preventDefault();
-    const point = e.touches ? e.touches[0] : e;
-    const { x, y } = getNormalizedCoords(point.clientX, point.clientY);
-    joyX = x;
-    joyY = y;
-    draw();
-}
-
-function handleEnd(e) {
-    if (!active) return;
-    e.preventDefault();
-    active = false;
-
-    if (animationId) {
-        cancelAnimationFrame(animationId);
-        animationId = null;
-    }
-
-    // Immediately reset joystick visual position to center
-    joyX = 0;
-    joyY = 0;
-    draw();
-
-    // Start coasting: send zero velocity for 5 seconds
-    publishTwist(0, 0);
-
-    // After 5 seconds, fully stop (reset joystick)
-    coastingTimeout = setTimeout(() => {
-        coastingTimeout = null;
-    }, COAST_DURATION);
-}
-
-// ---------- Publish Twist messages at ~30Hz while active ----------
-function startPublishing() {
-    if (animationId) cancelAnimationFrame(animationId);
-    function publishLoop() {
-        if (active) {
-            let linear = joyY * speedScale;
-            let angular = joyX * speedScale * -Math.sign(linear);
-            publishTwist(linear, angular);
-            animationId = requestAnimationFrame(publishLoop);
-        } else {
-            animationId = null;
-        }
-    }
-    publishLoop();
-}
 
 function publishTwist(linear, angular) {
     if (!ros.isConnected) return;
-    const twist = new ROSLIB.Message({
+
+    // TwistStamped requires a header
+    const msg = new ROSLIB.Message({
+        header: {
+            stamp: { sec: 0, nanosec: 0 },  // rosbridge fills this if left at 0
+            frame_id: 'base_link',
+        },
         twist: {
             linear: { x: linear, y: 0, z: 0 },
             angular: { x: 0, y: 0, z: angular },
-        }
+        },
     });
-    cmdVelPub.publish(twist);
 
-    // Update debug output
-    document.getElementById('linearVal').textContent = linear.toFixed(3);
-    document.getElementById('angularVal').textContent = angular.toFixed(3);
+    cmdVelTopic.publish(msg);
+
+    if (linearOut) linearOut.textContent = linear.toFixed(3);
+    if (angularOut) angularOut.textContent = angular.toFixed(3);
 }
 
-// ---------- Attach events (mouse + touch) ----------
-canvas.addEventListener('mousedown', handleStart);
-window.addEventListener('mousemove', handleMove);
-window.addEventListener('mouseup', handleEnd);
+// ─── Joystick geometry ───────────────────────────────────────────────────────
+const SIZE = canvas.width;          // assumes square canvas
+const CX = SIZE / 2;
+const CY = SIZE / 2;
+const MAX_R = SIZE * 0.32;           // dead zone begins at pixel 0 from center
+const KNOB_R = SIZE * 0.11;
+const DEAD_ZONE = 0.04;                  // normalized, ignore tiny inputs
 
-canvas.addEventListener('touchstart', handleStart, { passive: false });
-window.addEventListener('touchmove', handleMove, { passive: false });
-window.addEventListener('touchend', handleEnd);
+let joyNormX = 0;   // -1 … +1  (right = positive)
+let joyNormY = 0;   // -1 … +1  (forward = positive)
+let isActive = false;
 
-draw();
+// ─── Canvas drawing ──────────────────────────────────────────────────────────
+const ctx = canvas.getContext('2d');
+
+function drawJoystick() {
+    ctx.clearRect(0, 0, SIZE, SIZE);
+
+    // Base ring
+    ctx.beginPath();
+    ctx.arc(CX, CY, MAX_R + 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#1a2630';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(CX, CY, MAX_R, 0, Math.PI * 2);
+    ctx.fillStyle = '#2c3e4a';
+    ctx.fill();
+    ctx.strokeStyle = '#4a6070';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Crosshair
+    ctx.setLineDash([4, 6]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(CX - MAX_R, CY); ctx.lineTo(CX + MAX_R, CY);
+    ctx.moveTo(CX, CY - MAX_R); ctx.lineTo(CX, CY + MAX_R);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Knob — clamped to circle
+    let kx = CX + joyNormX * MAX_R;
+    let ky = CY - joyNormY * MAX_R;
+    const dist = Math.hypot(kx - CX, ky - CY);
+    if (dist > MAX_R) {
+        kx = CX + ((kx - CX) / dist) * MAX_R;
+        ky = CY + ((ky - CY) / dist) * MAX_R;
+    }
+
+    // Shadow glow when active
+    if (isActive) {
+        ctx.shadowColor = '#e67e22aa';
+        ctx.shadowBlur = 18;
+    }
+
+    ctx.beginPath();
+    ctx.arc(kx, ky, KNOB_R, 0, Math.PI * 2);
+    ctx.fillStyle = '#c0622a';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(kx, ky, KNOB_R * 0.78, 0, Math.PI * 2);
+    ctx.fillStyle = '#e67e22';
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+
+    // Center dot
+    ctx.beginPath();
+    ctx.arc(CX, CY, 3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fill();
+}
+
+// ─── Input → normalized coords ───────────────────────────────────────────────
+function toNormalized(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const sx = SIZE / rect.width;
+    const sy = SIZE / rect.height;
+    let dx = (clientX - rect.left) * sx - CX;
+    let dy = (clientY - rect.top) * sy - CY;
+
+    // Clamp to circle
+    const dist = Math.hypot(dx, dy);
+    if (dist > MAX_R) {
+        dx = (dx / dist) * MAX_R;
+        dy = (dy / dist) * MAX_R;
+    }
+
+    return {
+        x: dx / MAX_R,          //  right = +1
+        y: -dy / MAX_R,          //  up    = +1  (canvas Y is inverted)
+    };
+}
+
+// ─── Apply dead zone ─────────────────────────────────────────────────────────
+function applyDeadZone(v) {
+    if (Math.abs(v) < DEAD_ZONE) return 0;
+    // Re-scale so output starts from 0 just outside dead zone
+    return (v - Math.sign(v) * DEAD_ZONE) / (1 - DEAD_ZONE);
+}
+
+// ─── Publish loop (fixed rate) ────────────────────────────────────────────────
+let publishTimer = null;
+let stopTimer = null;
+
+function startPublishing() {
+    if (publishTimer) return;
+    publishTimer = setInterval(() => {
+        if (!isActive) return;
+
+        const speedScale = parseFloat(speedSlider.value);
+
+        // Apply dead zone, then scale by speed slider
+        const vx = applyDeadZone(joyNormX) * speedScale;  // lateral: right = +
+        const vy = applyDeadZone(joyNormY) * speedScale;  // longitudinal: fwd = +
+
+        // Differential drive:
+        //   linear  = forward component
+        //   angular = turning component (left = positive in ROS)
+        const linear = vy;
+        const angular = -vx;   // joystick right → negative angular (turn right)
+
+        publishTwist(linear, angular);
+    }, 1000 / PUBLISH_HZ);
+}
+
+function stopPublishing() {
+    if (publishTimer) {
+        clearInterval(publishTimer);
+        publishTimer = null;
+    }
+}
+
+// ─── Event handlers ───────────────────────────────────────────────────────────
+function onStart(e) {
+    if (!ros.isConnected) return;
+    e.preventDefault();
+
+    clearTimeout(stopTimer);
+    stopTimer = null;
+
+    isActive = true;
+    const pt = e.touches ? e.touches[0] : e;
+    ({ x: joyNormX, y: joyNormY } = toNormalized(pt.clientX, pt.clientY));
+    drawJoystick();
+    startPublishing();
+}
+
+function onMove(e) {
+    if (!isActive) return;
+    e.preventDefault();
+    const pt = e.touches ? e.touches[0] : e;
+    ({ x: joyNormX, y: joyNormY } = toNormalized(pt.clientX, pt.clientY));
+    drawJoystick();
+}
+
+function onEnd(e) {
+    if (!isActive) return;
+    e.preventDefault();
+    isActive = false;
+    joyNormX = 0;
+    joyNormY = 0;
+    drawJoystick();
+    stopPublishing();
+
+    // Send a final stop command after a short debounce
+    stopTimer = setTimeout(() => {
+        publishTwist(0, 0);
+        stopTimer = null;
+    }, STOP_DELAY_MS);
+}
+
+canvas.addEventListener('mousedown', onStart);
+window.addEventListener('mousemove', onMove);
+window.addEventListener('mouseup', onEnd);
+
+canvas.addEventListener('touchstart', onStart, { passive: false });
+window.addEventListener('touchmove', onMove, { passive: false });
+window.addEventListener('touchend', onEnd, { passive: false });
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+setConnected(false);
+drawJoystick();
