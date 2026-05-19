@@ -59,7 +59,7 @@ function shapeAxis(value) {
 
 function getCommand() {
     const linear = shapeAxis(joyY) * speedScale;
-    const angular = -shapeAxis(joyX) * speedScale;
+    const angular = shapeAxis(joyX) * speedScale;
     return {
         linear: clamp(linear, -1, 1),
         angular: clamp(angular, -1, 1),
