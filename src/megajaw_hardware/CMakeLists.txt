@@ -11,6 +11,7 @@ find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)  
 find_package(rclcpp REQUIRED)  
 find_package(rclcpp_lifecycle REQUIRED)  
+find_package(std_msgs REQUIRED)  
   
 # Create library: driver c files -> .so  
 add_library(megajaw_hardware SHARED  
@@ -36,8 +37,29 @@ target_link_libraries(megajaw_hardware pthread)
 # Plugin export  
 pluginlib_export_plugin_description_file(hardware_interface megajaw_hardware.xml)  
   
-# Install  
+# ─── Gripper control node ───────────────────────────────────  
+add_executable(gripper_control_node  
+  src/GripperDriver.cpp  
+  src/gripper_control_node.cpp  
+)  
+  
+target_include_directories(gripper_control_node PRIVATE  
+  include  
+)  
+  
+ament_target_dependencies(gripper_control_node  
+  rclcpp  
+  std_msgs  
+)  
+  
+target_link_libraries(gripper_control_node pthread)  
+  
+# ─── Install ────────────────────────────────────────────────  
 install(TARGETS megajaw_hardware  
+  DESTINATION lib/${PROJECT_NAME}  
+)  
+  
+install(TARGETS gripper_control_node  
   DESTINATION lib/${PROJECT_NAME}  
 )  
   
@@ -48,7 +70,5 @@ install(DIRECTORY include/
 install(FILES megajaw_hardware.xml  
   DESTINATION share/${PROJECT_NAME}  
 )  
-  
-  
   
 ament_package()
