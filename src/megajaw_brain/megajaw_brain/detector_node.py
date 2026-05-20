@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+import rclpy
+from rclpy.node import Node
+import numpy as np
+import ncnn
+from ament_index_python.packages import get_package_share_directory
+import cv2
+from sensor_msgs.msg import CompressedImage
+import os
+from megajaw_brain.utils import imgmsg_to_cv2, draw_detections, extract_largest_box
+
+
+class DetectorNode(Node):
+    def __init__(self):
+        super().__init__("detector_node")
+        self.get_logger().info(f"detector_node Started")
+
+        self.declare_parameter("debug", True)
+        self.debug = self.get_parameter("debug").value
+        
+        self.net = ncnn.Net()
+        self.net.load_param(os.path.join(get_package_share_directory("megajaw_brain"), "static", 'best_ncnn_model', "model.ncnn.param"))
+        self.net.load_model(os.path.join(get_package_share_directory("megajaw_brain"), "static", 'best_ncnn_model', "model.ncnn.bin"))
+
+        self.sub = self.create_subscription(
+            CompressedImage,
+            "/camera/image/compressed",
+            self.image_callback,
+            10,
+        )
+
+    def image_callback(self, msg):
+        frame_bgr = imgmsg_to_cv2(msg)
+        frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        h, w = frame_rgb.shape[:2]
+
+        mat = ncnn.Mat.from_pixels_resize(
+            frame_rgb,
+            ncnn.Mat.PixelType.PIXEL_RGB,
+            w,
+            h,
+            256,
+            256,
+        )
+
+        mean_vals = (0.0, 0.0, 0.0)
+        norm_vals = (1.0 / 255.0, 1.0 / 255.0, 1.0 / 255.0)
+        mat.substract_mean_normalize(mean_vals, norm_vals)
+
+        ex = self.net.create_extractor()
+        ex.input("in0", mat)
+        
+        ret, out = ex.extract("out0")
+        out = np.array(out) # 5 (cx, cy, nw, nh, class_score) x n_anchors
+
+        if ret == -1:
+            self.get_logger().error("Failed to extract output from the model ret = -1")
+        
+        largest_box = extract_largest_box(out, conf_thresh=0.25)
+        
+        if self.debug:
+            preview_frame = draw_detections(frame_bgr, out, conf_thresh=0.25)
+            
+            if largest_box is not None:
+                frame_h, frame_w = preview_frame.shape[:2]
+                x_scale = frame_w / 256
+                y_scale = frame_h / 256
+                
+                real_cx = int(largest_box['cx'] * x_scale)
+                real_cy = int(largest_box['cy'] * y_scale)
+
+                cv2.circle(preview_frame, (real_cx, real_cy), 9, (0, 0, 255), 2)
+
+
+            cv2.imshow("Debug View", preview_frame)
+            cv2.waitKey(1)
+
+        
+        
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = DetectorNode()
+    rclpy.spin(node)
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

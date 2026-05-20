@@ -1,5 +1,6 @@
 // ---------- ROS2 setup ----------
 const URL = 'ws://zeyadcodepi.local:9090' // ws://localhost:9090
+// const URL = 'ws://localhost:9090'
 const ros = new ROSLIB.Ros({ url: URL});
 const statusDiv = document.getElementById('statusMsg');
 const canvas = document.getElementById('joystickCanvas');

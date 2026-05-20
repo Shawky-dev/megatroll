@@ -15,7 +15,7 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     urdf_path = os.path.join(get_package_share_directory('megajaw_description'), 'urdf', 'megajaw.xacro.urdf')
-    world_file_path = os.path.join(get_package_share_directory('megajaw_bringup'), 'worlds', 'simple_world.sdf')
+    world_file_path = os.path.join(get_package_share_directory('megajaw_bringup'), 'worlds', 'modelled.sdf')
     rviz_config = PathJoinSubstitution(
         [
             FindPackageShare('megajaw_bringup'),
@@ -43,8 +43,12 @@ def generate_launch_description():
         package='ros_gz_sim',
         executable='create',
         output='screen',
-        arguments=['-topic', 'robot_description', '-name',
-                   'diff_drive', '-allow_renaming', 'true'],
+        arguments=[
+            '-topic', 'robot_description',
+            '-name', 'diff_drive',
+            '-allow_renaming', 'true',
+            '-Y', '3.14159',
+        ],
     )
     
     joint_state_broadcaster_spawner = Node(
