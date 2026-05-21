@@ -8,6 +8,9 @@ import cv2
 from sensor_msgs.msg import CompressedImage
 import os
 from megajaw_brain.utils import imgmsg_to_cv2, draw_detections, extract_largest_box
+from megajaw_brain import constants
+from megajaw_interfaces.msg import TargetControl
+import math
 
 
 class DetectorNode(Node):
@@ -17,10 +20,14 @@ class DetectorNode(Node):
 
         self.declare_parameter("debug", True)
         self.debug = self.get_parameter("debug").value
-        
+
+        gz_fov_x = constants.GZ_CAM_IMG_WIDTH / (2 * math.tan(constants.GZ_CAM_HFOV / 2))
+        self.declare_parameter("fov_x", gz_fov_x)
+        self.fov_x: float = self.get_parameter("fov_x").value or 0
+
         self.net = ncnn.Net()
-        self.net.load_param(os.path.join(get_package_share_directory("megajaw_brain"), "static", 'best_ncnn_model', "model.ncnn.param"))
-        self.net.load_model(os.path.join(get_package_share_directory("megajaw_brain"), "static", 'best_ncnn_model', "model.ncnn.bin"))
+        self.net.load_param(os.path.join(get_package_share_directory("megajaw_brain"), "static", "best_ncnn_model", "model.ncnn.param"))
+        self.net.load_model(os.path.join(get_package_share_directory("megajaw_brain"), "static", "best_ncnn_model", "model.ncnn.bin"))
 
         self.sub = self.create_subscription(
             CompressedImage,
@@ -29,7 +36,9 @@ class DetectorNode(Node):
             10,
         )
 
-    def image_callback(self, msg):
+        self.publisher = self.create_publisher(TargetControl, "/target_state", 10)
+
+    def image_callback(self, msg: CompressedImage):
         frame_bgr = imgmsg_to_cv2(msg)
         frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
         h, w = frame_rgb.shape[:2]
@@ -39,8 +48,8 @@ class DetectorNode(Node):
             ncnn.Mat.PixelType.PIXEL_RGB,
             w,
             h,
-            256,
-            256,
+            constants.YOLO_IMG_SZ,
+            constants.YOLO_IMG_SZ,
         )
 
         mean_vals = (0.0, 0.0, 0.0)
@@ -49,34 +58,43 @@ class DetectorNode(Node):
 
         ex = self.net.create_extractor()
         ex.input("in0", mat)
-        
+
         ret, out = ex.extract("out0")
-        out = np.array(out) # 5 (cx, cy, nw, nh, class_score) x n_anchors
+        out = np.array(out)  # 5 (cx, cy, nw, nh, class_score) x n_anchors
 
         if ret == -1:
             self.get_logger().error("Failed to extract output from the model ret = -1")
-        
+
         largest_box = extract_largest_box(out, conf_thresh=0.25)
-        
+
+        msg = TargetControl()
+        msg.target_detected = largest_box is not None
+
+        if largest_box is not None:
+            cx, cy = constants.YOLO_IMG_SZ // 2, constants.YOLO_IMG_SZ // 2
+            dx = (largest_box["cx"] - cx) / (constants.YOLO_IMG_SZ // 2)
+
+            msg.err_x = dx
+            msg.depth = (constants.OBJ_WIDTH_METERS * self.fov_x) / largest_box['w']
+
+        self.publisher.publish(msg)
+
         if self.debug:
             preview_frame = draw_detections(frame_bgr, out, conf_thresh=0.25)
-            
+
             if largest_box is not None:
                 frame_h, frame_w = preview_frame.shape[:2]
-                x_scale = frame_w / 256
-                y_scale = frame_h / 256
-                
-                real_cx = int(largest_box['cx'] * x_scale)
-                real_cy = int(largest_box['cy'] * y_scale)
+                x_scale = frame_w / constants.YOLO_IMG_SZ
+                y_scale = frame_h / constants.YOLO_IMG_SZ
+
+                real_cx = int(largest_box["cx"] * x_scale)
+                real_cy = int(largest_box["cy"] * y_scale)
 
                 cv2.circle(preview_frame, (real_cx, real_cy), 9, (0, 0, 255), 2)
-
 
             cv2.imshow("Debug View", preview_frame)
             cv2.waitKey(1)
 
-        
-        
 
 def main(args=None):
     rclpy.init(args=args)
@@ -84,5 +102,6 @@ def main(args=None):
     rclpy.spin(node)
     rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

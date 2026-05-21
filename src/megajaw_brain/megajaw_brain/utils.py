@@ -67,3 +67,6 @@ def extract_largest_box(out_arr: np.ndarray, conf_thresh=0.25):
         "h": float(row[3]),
         "confidence": float(row[4])
     }
+
+def clip_num(num: float, min_val, max_val):
+    return max(min_val, min(num, max_val))
