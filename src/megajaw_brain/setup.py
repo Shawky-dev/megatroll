@@ -26,7 +26,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "to_target_controller_node = megajaw_brain.to_target_controller_node:main",
+            "fsm = megajaw_brain.fsm:main",
             "detector_node = megajaw_brain.detector_node:main",
         ],
     },
