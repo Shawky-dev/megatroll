@@ -72,7 +72,7 @@ class DetectorNode(Node):
 
         if largest_box is not None:
             cx, cy = constants.YOLO_IMG_SZ // 2, constants.YOLO_IMG_SZ // 2
-            dx = (largest_box["cx"] - cx) / (constants.YOLO_IMG_SZ // 2)
+            dx = -(largest_box["cx"] - cx) / (constants.YOLO_IMG_SZ // 2)
 
             msg.err_x = dx
             msg.depth = (constants.OBJ_WIDTH_METERS * self.fov_x) / largest_box['w']

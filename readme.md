@@ -1,3 +1,6 @@
+TODO: /cmd_grip command shoudl be boolean for maximum efficiency
+TODO: in stm code before taking action check current gripper state
+
 # setup:
 1. export the assets/models path to gz sim 
 `export GZ_SIM_RESOURCE_PATH=~/.gz/sim/models`
