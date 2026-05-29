@@ -42,7 +42,7 @@ private:
     }
 
     std::unique_ptr<GripperDriver> gripper_driver_;
-    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr grip_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr grip_sub_;
 };
 
 int main(int argc, char *argv[])

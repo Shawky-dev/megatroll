@@ -108,7 +108,7 @@ def generate_launch_description():
                 executable="detector_node",
                 name="detector_node",
                 output="screen",
-                parameters=[{"debug": False}, {"use_sim_time": False}],
+                parameters=[{"debug": False}, {"is_sim": False}, {"use_sim_time": False}],
             ),
             rosbridge,
             gripper_control,

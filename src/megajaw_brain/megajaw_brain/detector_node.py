@@ -18,6 +18,9 @@ class DetectorNode(Node):
         super().__init__("detector_node")
         self.get_logger().info(f"detector_node Started")
 
+        self.declare_parameter("is_sim", True)
+        self.is_sim = self.get_parameter("is_sim").value
+        
         self.declare_parameter("debug", True)
         self.debug = self.get_parameter("debug").value
 
@@ -26,8 +29,13 @@ class DetectorNode(Node):
         self.fov_x: float = self.get_parameter("fov_x").value or 0
 
         self.net = ncnn.Net()
-        self.net.load_param(os.path.join(get_package_share_directory("megajaw_brain"), "static", "best_ncnn_model_gz", "model.ncnn.param"))
-        self.net.load_model(os.path.join(get_package_share_directory("megajaw_brain"), "static", "best_ncnn_model_gz", "model.ncnn.bin"))
+        
+        if self.is_sim:
+            self.net.load_param(os.path.join(get_package_share_directory("megajaw_brain"), "static", "best_ncnn_model_gz", "model.ncnn.param"))
+            self.net.load_model(os.path.join(get_package_share_directory("megajaw_brain"), "static", "best_ncnn_model_gz", "model.ncnn.bin"))
+        else:
+            self.net.load_param(os.path.join(get_package_share_directory("megajaw_brain"), "static", "best_ncnn_model_real", "model.ncnn.param"))
+            self.net.load_model(os.path.join(get_package_share_directory("megajaw_brain"), "static", "best_ncnn_model_real", "model.ncnn.bin"))
 
         self.sub = self.create_subscription(
             CompressedImage,
