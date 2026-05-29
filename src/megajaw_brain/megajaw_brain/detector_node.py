@@ -26,8 +26,8 @@ class DetectorNode(Node):
         self.fov_x: float = self.get_parameter("fov_x").value or 0
 
         self.net = ncnn.Net()
-        self.net.load_param(os.path.join(get_package_share_directory("megajaw_brain"), "static", "best_ncnn_model", "model.ncnn.param"))
-        self.net.load_model(os.path.join(get_package_share_directory("megajaw_brain"), "static", "best_ncnn_model", "model.ncnn.bin"))
+        self.net.load_param(os.path.join(get_package_share_directory("megajaw_brain"), "static", "best_ncnn_model_gz", "model.ncnn.param"))
+        self.net.load_model(os.path.join(get_package_share_directory("megajaw_brain"), "static", "best_ncnn_model_gz", "model.ncnn.bin"))
 
         self.sub = self.create_subscription(
             CompressedImage,

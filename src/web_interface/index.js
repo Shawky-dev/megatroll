@@ -5,6 +5,10 @@ const ros = new ROSLIB.Ros({ url: URL});
 const statusDiv = document.getElementById('statusMsg');
 const canvas = document.getElementById('joystickCanvas');
 const speedSlider = document.getElementById('speedScale');
+const cameraImg = document.getElementById('cameraImage');
+const cameraStatusDiv = document.getElementById('cameraStatus');
+let lastFrameTime = null;
+let fps = 0;
 
 let reconnectInterval = null;
 const RECONNECT_DELAY = 2000; // 2 seconds  
@@ -47,6 +51,35 @@ ros.on('close', () => {
     canvas.style.opacity = '0.5';
     canvas.style.pointerEvents = 'none';
     attemptReconnect();
+});
+
+// ---------- Camera feed subscription ----------
+const cameraTopic = new ROSLIB.Topic({
+    ros: ros,
+    name: '/camera/image/compressed',
+    messageType: 'sensor_msgs/msg/CompressedImage'
+});
+
+cameraTopic.subscribe(function(message) {
+    const imgSrc = 'data:image/jpeg;base64,' + message.data;
+    cameraImg.src = imgSrc;
+    cameraStatusDiv.textContent = '📹 LIVE';
+    const now = Date.now();
+    if (lastFrameTime) {
+        const dt = (now - lastFrameTime) / 1000;
+        fps = 1 / dt;
+    }
+    lastFrameTime = now;
+});
+
+ros.on('error', (err) => {
+    // Update camera status on error
+    cameraStatusDiv.textContent = '⚠️ Camera error';
+});
+
+ros.on('connection', () => {
+    // Reset camera status on reconnect
+    cameraStatusDiv.textContent = 'Connecting to camera...';
 });
 
 const cmdVelPub = new ROSLIB.Topic({

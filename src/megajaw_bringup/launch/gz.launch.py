@@ -2,11 +2,20 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+)
 from launch.actions import RegisterEventHandler
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import (
+    Command,
+    FindExecutable,
+    LaunchConfiguration,
+    PathJoinSubstitution,
+)
 from launch.conditions import IfCondition, UnlessCondition
 
 from launch_ros.actions import Node
@@ -14,8 +23,12 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    urdf_path = os.path.join(get_package_share_directory("megajaw_description"), "urdf", "megajaw.xacro.urdf")
-    world_file_path = os.path.join(get_package_share_directory("megajaw_bringup"), "worlds", "modelled.sdf")
+    urdf_path = os.path.join(
+        get_package_share_directory("megajaw_description"), "urdf", "megajaw.xacro.urdf"
+    )
+    world_file_path = os.path.join(
+        get_package_share_directory("megajaw_bringup"), "worlds", "modelled.sdf"
+    )
     rviz_config = PathJoinSubstitution(
         [
             FindPackageShare("megajaw_bringup"),
@@ -30,9 +43,14 @@ def generate_launch_description():
     debug_mode = LaunchConfiguration("debug", default="false")
 
     def robot_state_publisher_callback(context):
-        robot_description_content = Command(["xacro ", urdf_path])
+        robot_description_content = Command(["xacro ", urdf_path, " sim:=true"])
         robot_description = {"robot_description": robot_description_content}
-        node_robot_state_publisher = Node(package="robot_state_publisher", executable="robot_state_publisher", output="screen", parameters=[robot_description])
+        node_robot_state_publisher = Node(
+            package="robot_state_publisher",
+            executable="robot_state_publisher",
+            output="screen",
+            parameters=[robot_description],
+        )
         return [node_robot_state_publisher]
 
     gz_spawn_entity = Node(
@@ -104,7 +122,12 @@ def generate_launch_description():
         ]
     )
 
-    bridge = Node(package="ros_gz_bridge", executable="parameter_bridge", parameters=[{"config_file": bridge_config}], output="screen")
+    bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        parameters=[{"config_file": bridge_config}],
+        output="screen",
+    )
 
     # Node to bridge camera image with image_transport and compressed_image_transport
     gz_image_bridge_node = Node(
@@ -115,7 +138,10 @@ def generate_launch_description():
         ],
         output="screen",
         parameters=[
-            {"use_sim_time": LaunchConfiguration("use_sim_time"), "camera.image.compressed.jpeg_quality": 75},
+            {
+                "use_sim_time": LaunchConfiguration("use_sim_time"),
+                "camera.image.compressed.jpeg_quality": 75,
+            },
         ],
     )
 
@@ -147,7 +173,7 @@ def generate_launch_description():
         output="screen",
         parameters=[{"port": 9090}],
     )
-    
+
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
@@ -186,7 +212,18 @@ def generate_launch_description():
         [
             # Launch gazebo environment
             IncludeLaunchDescription(
-                PythonLaunchDescriptionSource([PathJoinSubstitution([FindPackageShare("ros_gz_sim"), "launch", "gz_sim.launch.py"])]), launch_arguments=[("gz_args", [" -r -v 1 ", world_file_path])]
+                PythonLaunchDescriptionSource(
+                    [
+                        PathJoinSubstitution(
+                            [
+                                FindPackageShare("ros_gz_sim"),
+                                "launch",
+                                "gz_sim.launch.py",
+                            ]
+                        )
+                    ]
+                ),
+                launch_arguments=[("gz_args", [" -r -v 1 ", world_file_path])],
             ),
             # RegisterEventHandler(
             #     event_handler=OnProcessExit(
@@ -210,9 +247,17 @@ def generate_launch_description():
             #     )
             # ),
             # Launch Arguments
-            DeclareLaunchArgument("use_sim_time", default_value=use_sim_time, description="If true, use simulated clock"),
-            DeclareLaunchArgument("rviz", default_value="false", description="Launch RViz2"),
-            DeclareLaunchArgument("debug_mode", default_value="false", description="Enable debug mode"),
+            DeclareLaunchArgument(
+                "use_sim_time",
+                default_value=use_sim_time,
+                description="If true, use simulated clock",
+            ),
+            DeclareLaunchArgument(
+                "rviz", default_value="false", description="Launch RViz2"
+            ),
+            DeclareLaunchArgument(
+                "debug_mode", default_value="false", description="Enable debug mode"
+            ),
             # Nodes
             bridge,
             gz_spawn_entity,
