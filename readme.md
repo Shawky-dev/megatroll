@@ -291,6 +291,7 @@ The real camera driver connects to IP Webcam video streams. Current configured U
 ```text
 http://192.168.1.11:8080/video
 http://192.168.43.1:8080/video
+
 ```
 
 The camera node keeps the OpenCV buffer small to reduce latency and publishes JPEG-compressed frames on `/camera/image/compressed`.
@@ -312,3 +313,5 @@ The camera node keeps the OpenCV buffer small to reduce latency and publishes JP
 ## Status
 
 MegaJaw is a robotics prototype and portfolio project. The repository demonstrates the full loop from simulation to perception, manual control, autonomous behavior, and real hardware integration.
+
+# Training done here: https://www.kaggle.com/code/zeyadcode/megatroll-dataset-training
