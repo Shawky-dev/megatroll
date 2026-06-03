@@ -1,12 +1,19 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
 from launch_ros.actions import Node
-from launch.substitutions import Command, PathJoinSubstitution
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
+    debug_mode_arg = DeclareLaunchArgument(
+            'debug',
+            default_value='false',
+            description='Enable debug mode'
+    )
+    
     urdf_path = os.path.join(get_package_share_directory("megajaw_description"), "urdf", "megajaw.xacro.urdf")
     controller_config = PathJoinSubstitution([FindPackageShare("megajaw_bringup"), "config", "diff_drive_controller.yaml"])
 
@@ -118,7 +125,7 @@ def generate_launch_description():
         parameters=[
             {"max_lost_frames": 30},  # note: phone cam runs at 30fps
             {"conf_thresh": 0.7},
-            {"debug": False},
+            {"debug": PythonExpression(["'", LaunchConfiguration("debug", default="false"), "' == 'true'"])},
             {"is_sim": False},
             {"use_sim_time": False},
         ],
@@ -126,6 +133,7 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            debug_mode_arg,
             robot_state_publisher,
             controller_manager,
             joint_state_broadcaster_spawner,

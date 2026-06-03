@@ -32,6 +32,7 @@ class DetectorNode(Node):
 
         self.declare_parameter("debug", True)
         self.debug = self.get_parameter("debug").value
+        print(f"============== DEBUG MODE: {self.debug} ================")
 
         self.fx = 1497.70202
         self.fy = 1435.16210
@@ -51,9 +52,7 @@ class DetectorNode(Node):
             [0.09600973, -1.13969576, 0.00809251, -0.01848817, 1.54268659],
             dtype=np.float32,
         )
-        self.yolo_img_sz = (
-            constants.YOLO_IMG_SZ_GZ if self.is_sim else constants.YOLO_IMG_SZ_REAL
-        )
+        self.yolo_img_sz = constants.YOLO_IMG_SZ_GZ if self.is_sim else constants.YOLO_IMG_SZ_REAL
 
         self.net = ncnn.Net()  # type: ignore
 
@@ -75,6 +74,12 @@ class DetectorNode(Node):
                 ),
                 task="detect",
             )
+
+        self.tracker_yaml_path = os.path.join(
+            get_package_share_directory("megajaw_brain"),
+            "static",
+            "tracker_conf.yaml",
+        )
 
         self.sub = self.create_subscription(
             CompressedImage,
@@ -101,7 +106,11 @@ class DetectorNode(Node):
         h, w = frame_bgr.shape[:2]
 
         results = self.model.track(
-            frame_bgr, persist=True, conf=self.conf_thresh, verbose=False
+            frame_bgr,
+            persist=True,
+            conf=self.conf_thresh,
+            verbose=False,
+            tracker=self.tracker_yaml_path,
         )[0]
 
         boxes = results.boxes
@@ -122,17 +131,11 @@ class DetectorNode(Node):
             elif self.locked_track_id is not None and self.locked_track_id not in ids:
                 self.lost_frame_counter += 1
                 if self.lost_frame_counter > self.max_lost_frames:
-                    self.get_logger().warn(
-                        f"[TargetLock] Lock DROPPED on ID {self.locked_track_id} "
-                        f"after {self.lost_frame_counter} lost frames. Re-acquiring..."
-                    )
+                    self.get_logger().warn(f"[TargetLock] Lock DROPPED on ID {self.locked_track_id} " f"after {self.lost_frame_counter} lost frames. Re-acquiring...")
                     self.locked_track_id = None
                     self.lost_frame_counter = 0
                 else:
-                    self.get_logger().info(
-                        f"[TargetLock] ID {self.locked_track_id} missing "
-                        f"({self.lost_frame_counter}/{self.max_lost_frames})"
-                    )
+                    self.get_logger().info(f"[TargetLock] ID {self.locked_track_id} missing " f"({self.lost_frame_counter}/{self.max_lost_frames})")
                 # best_box_xywh stays None while in grace buffer
 
             # --- Condition C: No active lock — acquire best target ---
@@ -149,19 +152,13 @@ class DetectorNode(Node):
                     self.locked_track_id = ids[best_idx]
                     best_box_xywh = xywh_list[best_idx]
                     self.lost_frame_counter = 0
-                    self.get_logger().info(
-                        f"[TargetLock] LOCKED onto ID {self.locked_track_id} "
-                        f"(score={best_score:.1f})"
-                    )
+                    self.get_logger().info(f"[TargetLock] LOCKED onto ID {self.locked_track_id} " f"(score={best_score:.1f})")
         else:
             # No detections at all — apply grace buffer logic if locked
             if self.locked_track_id is not None:
                 self.lost_frame_counter += 1
                 if self.lost_frame_counter > self.max_lost_frames:
-                    self.get_logger().warn(
-                        f"[TargetLock] Lock DROPPED on ID {self.locked_track_id} "
-                        f"(no detections for {self.lost_frame_counter} frames)"
-                    )
+                    self.get_logger().warn(f"[TargetLock] Lock DROPPED on ID {self.locked_track_id} " f"(no detections for {self.lost_frame_counter} frames)")
                     self.locked_track_id = None
                     self.lost_frame_counter = 0
 

@@ -1,0 +1,7 @@
+tracker_type: bytetrack
+track_high_thresh: 0.85
+track_low_thresh: 0.05
+new_track_thresh: 0.5
+match_thresh: 0.9
+track_buffer: 15
+fuse_score: True         # fuse detection score with track score

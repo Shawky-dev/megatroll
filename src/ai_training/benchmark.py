@@ -14,7 +14,7 @@ WARMUP_RUNS = 2  # warmup iterations (not counted)
 TEST_RUNS = 100  # measured iterations
 CONF = 0.25
 IOU = 0.7
-TRACKER =  "botsort.yaml" # bytetrack.yaml | "botsort.yaml"
+TRACKER =  "bytetrack.yaml" # bytetrack.yaml | "botsort.yaml"
 SEED = 42
 
 

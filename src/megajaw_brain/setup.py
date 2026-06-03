@@ -13,6 +13,7 @@ setup(
         ("share/" + package_name, ["package.xml"]),
         (os.path.join("share", package_name, "static", "best_ncnn_model_gz"), glob("static/best_ncnn_model_gz/*")),
         (os.path.join("share", package_name, "static", "best_ncnn_model_real"), glob("static/best_ncnn_model_real/*")),
+        (os.path.join("share", package_name, "static"), ["static/tracker_conf.yaml"]),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
